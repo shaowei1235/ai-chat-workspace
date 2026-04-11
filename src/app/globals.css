@@ -1,29 +1,127 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 /* Use class-based dark mode so we can support light / dark / system switching. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Theme tokens (minimal, semantic, and extendable). */
 :root {
+  --radius: 0.75rem;
+
   --background: #ffffff;
   --foreground: #171717;
+
+  --card: #ffffff;
+  --card-foreground: #171717;
+
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+
+  --primary: #0052ff;
+  --primary-foreground: #ffffff;
+
+  --secondary: #eef0f3;
+  --secondary-foreground: #171717;
+
+  --muted: #eef0f3;
+  --muted-foreground: #5b616e;
+
+  --accent: #eef0f3;
+  --accent-foreground: #171717;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: rgb(0 0 0 / 10%);
+  --input: rgb(0 0 0 / 10%);
+  --ring: rgb(0 82 255 / 40%);
+
   color-scheme: light;
 }
 
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+
+  --card: rgb(255 255 255 / 4%);
+  --card-foreground: #ededed;
+
+  --popover: rgb(255 255 255 / 4%);
+  --popover-foreground: #ededed;
+
+  --primary: #578bfa;
+  --primary-foreground: #0a0b0d;
+
+  --secondary: rgb(255 255 255 / 6%);
+  --secondary-foreground: #ededed;
+
+  --muted: rgb(255 255 255 / 6%);
+  --muted-foreground: rgb(237 237 237 / 70%);
+
+  --accent: rgb(255 255 255 / 6%);
+  --accent-foreground: #ededed;
+
+  --destructive: #f87171;
+  --destructive-foreground: #0a0b0d;
+
+  --border: rgb(255 255 255 / 14%);
+  --input: rgb(255 255 255 / 14%);
+  --ring: rgb(87 139 250 / 45%);
+
   color-scheme: dark;
 }
 
+/* Bridge CSS variables into Tailwind v4 theme tokens. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+/* Global baseline (keep small; avoid heavy resets). */
+html {
+  scrollbar-gutter: stable;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

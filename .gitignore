@@ -40,6 +40,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-DESIGN.md
+
+AGENTS.md
 CLAUDE.md
 DESIGN.md
+/note
+
+
+
+
+

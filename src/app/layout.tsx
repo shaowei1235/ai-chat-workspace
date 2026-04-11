@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -19,8 +20,7 @@ export const metadata: Metadata = {
     default: 'AI Chat Workspace',
     template: '%s · AI Chat Workspace',
   },
-  description:
-    'A step-by-step interview and learning project for building an AI chat workspace.',
+  description: 'AI chat workspace.',
 }
 
 export default function RootLayout({
@@ -42,8 +42,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {/* A minimal full-height page frame; future shells/providers can wrap children here when needed. */}
-          <div className="min-h-dvh flex flex-col">{children}</div>
+          {/* Tooltip needs a shared provider so triggers/portals behave consistently across the app. */}
+          <TooltipProvider>
+            {/* A minimal full-height page frame; future shells/providers can wrap children here when needed. */}
+            <div className="min-h-dvh flex flex-col">{children}</div>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>
