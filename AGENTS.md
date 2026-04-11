@@ -83,3 +83,15 @@ Current expectation:
 - Avoid locking the project into a single-language-only architecture
 
 Do not force full i18n implementation before the relevant step begins.
+
+## Theme Rules
+
+This project must support both light mode and dark mode.
+
+Rules:
+
+- All newly added UI must work in both light and dark themes
+- Do not hardcode colors that only look correct in light mode
+- Prefer semantic and reusable styling decisions
+- When using Tailwind classes, consider dark mode variants
+- Theme support should be built progressively, but all new UI must remain compatible
