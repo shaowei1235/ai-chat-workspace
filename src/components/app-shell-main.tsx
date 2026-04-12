@@ -7,20 +7,22 @@ import type { Chat } from '@/types/chat'
 
 type AppShellMainProps = {
   currentChat: Chat | null
+  inputValue: string
   isCurrentChatGenerating: boolean
   isGenerating: boolean
-  inputValue: string
   locale: Locale
+  requestError: string | null
   onInputChange: (nextValue: string) => void
   onSendMessage: () => void
 }
 
 export function AppShellMain({
   currentChat,
+  inputValue,
   isCurrentChatGenerating,
   isGenerating,
-  inputValue,
   locale,
+  requestError,
   onInputChange,
   onSendMessage,
 }: AppShellMainProps) {
@@ -58,7 +60,7 @@ export function AppShellMain({
                     <div className="mt-3 text-sm leading-6 text-muted-foreground">
                       {t(locale, 'emptyState', 'emptyChatDescription')}
                     </div>
-                      </div>
+                  </div>
                 </div>
               ) : (
                 <div className="flex-1 space-y-4">
@@ -122,44 +124,44 @@ export function AppShellMain({
                   ) : null}
                 </div>
               )}
-              </div>
-            ) : (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="w-full max-w-3xl">
-                  <div className="mx-auto max-w-2xl text-center">
-                    <div className="text-3xl font-semibold tracking-tight md:text-4xl">
-                      {t(locale, 'emptyState', 'heroTitle')}
-                    </div>
-                    <div className="mt-3 text-sm leading-6 text-muted-foreground">
-                      {t(locale, 'emptyState', 'heroSubtitle')}
-                    </div>
+            </div>
+          ) : (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="w-full max-w-3xl">
+                <div className="mx-auto max-w-2xl text-center">
+                  <div className="text-3xl font-semibold tracking-tight md:text-4xl">
+                    {t(locale, 'emptyState', 'heroTitle')}
                   </div>
-
-                  <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-3">
-                    {[
-                      t(locale, 'emptyState', 'example1'),
-                      t(locale, 'emptyState', 'example2'),
-                      t(locale, 'emptyState', 'example3'),
-                      t(locale, 'emptyState', 'example4'),
-                      t(locale, 'emptyState', 'example5'),
-                      t(locale, 'emptyState', 'example6'),
-                    ].map((example) => (
-                      <div
-                        key={example}
-                        className="rounded-full border border-border/60 bg-muted/20 px-4 py-2 text-sm text-foreground"
-                      >
-                        {example}
-                      </div>
-                    ))}
+                  <div className="mt-3 text-sm leading-6 text-muted-foreground">
+                    {t(locale, 'emptyState', 'heroSubtitle')}
                   </div>
                 </div>
+
+                <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-3">
+                  {[
+                    t(locale, 'emptyState', 'example1'),
+                    t(locale, 'emptyState', 'example2'),
+                    t(locale, 'emptyState', 'example3'),
+                    t(locale, 'emptyState', 'example4'),
+                    t(locale, 'emptyState', 'example5'),
+                    t(locale, 'emptyState', 'example6'),
+                  ].map((example) => (
+                    <div
+                      key={example}
+                      className="rounded-full border border-border/60 bg-muted/20 px-4 py-2 text-sm text-foreground"
+                    >
+                      {example}
+                    </div>
+                  ))}
+                </div>
               </div>
+            </div>
           )}
         </section>
 
         <div className="sticky bottom-0 pb-6 pt-4 md:pb-8">
           <div className="mx-auto w-full max-w-3xl bg-background/95 supports-[backdrop-filter]:bg-background/80">
-            {/* Keep the input area minimal: local-only text that appends a user message to the active chat. */}
+            {/* Keep the input area minimal: disable submit while one AI reply is in flight. */}
             <div className="rounded-2xl border border-border/60 bg-background/80 p-3 shadow-xs backdrop-blur-sm">
               <Textarea
                 aria-label={t(locale, 'emptyState', 'inputPlaceholder')}
@@ -180,12 +182,19 @@ export function AppShellMain({
                 value={inputValue}
               />
               <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="text-xs text-muted-foreground">
-                  {!currentChat
-                    ? t(locale, 'emptyState', 'emptyInputGuard')
-                    : isGenerating
-                      ? t(locale, 'emptyState', 'pendingInputDescription')
-                      : t(locale, 'emptyState', 'inputDescription')}
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">
+                    {!currentChat
+                      ? t(locale, 'emptyState', 'emptyInputGuard')
+                      : isGenerating
+                        ? t(locale, 'emptyState', 'pendingInputDescription')
+                        : t(locale, 'emptyState', 'inputDescription')}
+                  </div>
+                  {requestError ? (
+                    <div className="text-xs text-destructive">
+                      {requestError}
+                    </div>
+                  ) : null}
                 </div>
                 <Button
                   aria-label={t(locale, 'emptyState', 'sendButtonLabel')}

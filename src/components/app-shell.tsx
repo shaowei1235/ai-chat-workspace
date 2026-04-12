@@ -10,9 +10,7 @@ type AppShellProps = {
   locale: Locale
 }
 
-const LOCAL_ASSISTANT_REPLY_PREFIX =
-  '这是一个本地假回复，用来占位未来的 AI 输出：'
-const LOCAL_ASSISTANT_REPLY_SUFFIX = '后续步骤会把这里替换成真实模型返回内容。'
+const LOCAL_REQUEST_ERROR_LOG = '获取 AI 回复失败'
 
 export function AppShell({ locale }: AppShellProps) {
   // Keep local state in the shell so Sidebar and Main read from the same source of truth.
@@ -20,7 +18,8 @@ export function AppShell({ locale }: AppShellProps) {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const [generatingChatId, setGeneratingChatId] = useState<string | null>(null)
   const [inputValue, setInputValue] = useState('')
-  const replyTimerRef = useRef<number | null>(null)
+  const [requestError, setRequestError] = useState<string | null>(null)
+  const pendingDelayRef = useRef<number | null>(null)
 
   const currentChat = chats.find((chat) => chat.id === currentChatId) ?? null
   const isGenerating = generatingChatId !== null
@@ -29,8 +28,8 @@ export function AppShell({ locale }: AppShellProps) {
 
   useEffect(() => {
     return () => {
-      if (replyTimerRef.current !== null) {
-        window.clearTimeout(replyTimerRef.current)
+      if (pendingDelayRef.current !== null) {
+        window.clearTimeout(pendingDelayRef.current)
       }
     }
   }, [])
@@ -45,25 +44,52 @@ export function AppShell({ locale }: AppShellProps) {
 
     setChats((previousChats) => [createdChat, ...previousChats])
     setCurrentChatId(createdChat.id)
+    setRequestError(null)
   }
 
   function handleSelectChat(chatId: string) {
     setCurrentChatId(chatId)
+    setRequestError(null)
   }
 
   function handleInputChange(nextValue: string) {
     setInputValue(nextValue)
   }
 
-  function buildAssistantReply(userInput: string) {
-    return [
-      LOCAL_ASSISTANT_REPLY_PREFIX,
-      `“${userInput}”`,
-      LOCAL_ASSISTANT_REPLY_SUFFIX,
-    ].join(' ')
+  async function waitForPendingDelay() {
+    await new Promise<void>((resolve) => {
+      pendingDelayRef.current = window.setTimeout(() => {
+        pendingDelayRef.current = null
+        resolve()
+      }, 300)
+    })
   }
 
-  function handleSendMessage() {
+  async function requestAssistantReply(messages: ChatMessage[]) {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ messages }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`聊天请求失败: ${response.status}`)
+    }
+
+    const data = (await response.json()) as {
+      content?: string
+    }
+
+    if (!data.content) {
+      throw new Error('聊天接口未返回内容')
+    }
+
+    return data.content
+  }
+
+  async function handleSendMessage() {
     const trimmedValue = inputValue.trim()
 
     if (!currentChatId || trimmedValue.length === 0 || isGenerating) {
@@ -71,33 +97,42 @@ export function AppShell({ locale }: AppShellProps) {
     }
 
     const targetChatId = currentChatId
-
-    const nextMessage: ChatMessage = {
+    const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: trimmedValue,
       createdAt: new Date().toISOString(),
     }
 
+    let nextMessagesForRequest: ChatMessage[] = []
+
     setChats((previousChats) =>
-      previousChats.map((chat) =>
-        chat.id === targetChatId
-          ? {
-              ...chat,
-              messages: [...chat.messages, nextMessage],
-            }
-          : chat,
-      ),
+      previousChats.map((chat) => {
+        if (chat.id !== targetChatId) {
+          return chat
+        }
+
+        nextMessagesForRequest = [...chat.messages, userMessage]
+
+        return {
+          ...chat,
+          messages: nextMessagesForRequest,
+        }
+      }),
     )
+
+    setRequestError(null)
     setGeneratingChatId(targetChatId)
     setInputValue('')
 
-    // Simulate the time gap between sending a user message and receiving an AI reply.
-    replyTimerRef.current = window.setTimeout(() => {
+    try {
+      await waitForPendingDelay()
+
+      const assistantContent = await requestAssistantReply(nextMessagesForRequest)
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: buildAssistantReply(trimmedValue),
+        content: assistantContent,
         createdAt: new Date().toISOString(),
       }
 
@@ -111,9 +146,12 @@ export function AppShell({ locale }: AppShellProps) {
             : chat,
         ),
       )
+    } catch (error) {
+      console.error(LOCAL_REQUEST_ERROR_LOG, error)
+      setRequestError(t(locale, 'emptyState', 'requestErrorMessage'))
+    } finally {
       setGeneratingChatId(null)
-      replyTimerRef.current = null
-    }, 900)
+    }
   }
 
   return (
@@ -127,10 +165,11 @@ export function AppShell({ locale }: AppShellProps) {
       />
       <AppShellMain
         currentChat={currentChat}
+        inputValue={inputValue}
         isCurrentChatGenerating={isCurrentChatGenerating}
         isGenerating={isGenerating}
-        inputValue={inputValue}
         locale={locale}
+        requestError={requestError}
         onInputChange={handleInputChange}
         onSendMessage={handleSendMessage}
       />
