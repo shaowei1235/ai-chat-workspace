@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { defaultLocale, messages } from '@/i18n/messages'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -17,10 +18,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: {
     // Enables per-page titles later without changing the root layout structure.
-    default: 'AI Chat Workspace',
-    template: '%s · AI Chat Workspace',
+    default: messages[defaultLocale].common.appName,
+    template: `%s · ${messages[defaultLocale].common.appName}`,
   },
-  description: 'AI chat workspace.',
+  description: messages[defaultLocale].common.appDescription,
 }
 
 export default function RootLayout({
