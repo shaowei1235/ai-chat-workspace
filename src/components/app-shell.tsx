@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { ArrowUp, MessageSquare, Plus, Sparkles, UserCircle2 } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { ArrowUp, MessageSquare, Plus, UserCircle2 } from 'lucide-react'
 import type { Locale } from '@/i18n/messages'
 import { t } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
-import type { Chat } from '@/types/chat'
+import type { Chat, ChatMessage } from '@/types/chat'
 
 type AppShellProps = {
   locale: Locale
@@ -25,6 +26,7 @@ export function AppShell({ locale }: AppShellProps) {
   // Keep Step 13 state local to the shared shell so Sidebar and Main stay synchronized.
   const [chats, setChats] = useState<Chat[]>([])
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+  const [composerValue, setComposerValue] = useState('')
 
   const currentChat = chats.find((chat) => chat.id === currentChatId) ?? null
 
@@ -37,6 +39,7 @@ export function AppShell({ locale }: AppShellProps) {
         id: crypto.randomUUID(),
         title: `${t(locale, 'sidebar', 'newChatDefaultTitle')} ${nextChatNumber}`,
         createdAt: new Date().toISOString(),
+        messages: [],
       }
       nextChat = createdChat
 
@@ -52,6 +55,37 @@ export function AppShell({ locale }: AppShellProps) {
     setCurrentChatId(chatId)
   }
 
+  function handleComposerChange(nextValue: string) {
+    setComposerValue(nextValue)
+  }
+
+  function handleSendMessage() {
+    const trimmedValue = composerValue.trim()
+
+    if (!currentChatId || trimmedValue.length === 0) {
+      return
+    }
+
+    const nextMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: trimmedValue,
+      createdAt: new Date().toISOString(),
+    }
+
+    setChats((previousChats) =>
+      previousChats.map((chat) =>
+        chat.id === currentChatId
+          ? {
+              ...chat,
+              messages: [...chat.messages, nextMessage],
+            }
+          : chat,
+      ),
+    )
+    setComposerValue('')
+  }
+
   return (
     <div className="flex min-h-dvh flex-col bg-background md:flex-row">
       <AppShellSidebar
@@ -61,7 +95,13 @@ export function AppShell({ locale }: AppShellProps) {
         onCreateChat={handleCreateChat}
         onSelectChat={handleSelectChat}
       />
-      <AppShellMain currentChat={currentChat} locale={locale} />
+      <AppShellMain
+        composerValue={composerValue}
+        currentChat={currentChat}
+        locale={locale}
+        onComposerChange={handleComposerChange}
+        onSendMessage={handleSendMessage}
+      />
     </div>
   )
 }
@@ -181,10 +221,19 @@ function AppShellSidebar({
 }
 
 type AppShellMainProps = AppShellProps & {
+  composerValue: string
   currentChat: Chat | null
+  onComposerChange: (nextValue: string) => void
+  onSendMessage: () => void
 }
 
-function AppShellMain({ currentChat, locale }: AppShellMainProps) {
+function AppShellMain({
+  composerValue,
+  currentChat,
+  locale,
+  onComposerChange,
+  onSendMessage,
+}: AppShellMainProps) {
   return (
     <main className="flex min-h-dvh flex-1 flex-col bg-background px-6 md:px-10">
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
@@ -201,48 +250,67 @@ function AppShellMain({ currentChat, locale }: AppShellMainProps) {
           </div>
         </header>
 
-        <section className="flex flex-1 items-center justify-center py-8">
+        <section className="flex flex-1 flex-col py-8">
           {currentChat ? (
-            <div className="w-full max-w-3xl">
-              <div className="mx-auto max-w-2xl rounded-2xl border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
+            <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
+              <div className="pb-4">
                 <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   {t(locale, 'emptyState', 'messageAreaLabel')}
                 </div>
-                <div className="mt-3 text-2xl font-semibold tracking-tight">
-                  {t(locale, 'emptyState', 'messageAreaTitle')}
-                </div>
-                <div className="mt-3 text-sm leading-6 text-muted-foreground">
-                  {t(locale, 'emptyState', 'messageAreaDescription')}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="w-full max-w-3xl">
-              <div className="mx-auto max-w-2xl text-center">
-                <div className="text-3xl font-semibold tracking-tight md:text-4xl">
-                  {t(locale, 'emptyState', 'heroTitle')}
-                </div>
-                <div className="mt-3 text-sm leading-6 text-muted-foreground">
-                  {t(locale, 'emptyState', 'heroSubtitle')}
-                </div>
               </div>
 
-              <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-3">
-                {[
-                  t(locale, 'emptyState', 'example1'),
-                  t(locale, 'emptyState', 'example2'),
-                  t(locale, 'emptyState', 'example3'),
-                  t(locale, 'emptyState', 'example4'),
-                  t(locale, 'emptyState', 'example5'),
-                  t(locale, 'emptyState', 'example6'),
-                ].map((example) => (
-                  <div
-                    key={example}
-                    className="rounded-full border border-border/60 bg-muted/20 px-4 py-2 text-sm text-foreground"
-                  >
-                    {example}
+              {currentChat.messages.length === 0 ? (
+                <div className="flex flex-1 items-center justify-center">
+                  <div className="mx-auto max-w-2xl rounded-2xl border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
+                    <div className="text-2xl font-semibold tracking-tight">
+                      {t(locale, 'emptyState', 'emptyChatTitle')}
+                    </div>
+                    <div className="mt-3 text-sm leading-6 text-muted-foreground">
+                      {t(locale, 'emptyState', 'emptyChatDescription')}
+                    </div>
                   </div>
-                ))}
+                </div>
+              ) : (
+                <div className="flex-1 space-y-4">
+                  {currentChat.messages.map((message) => (
+                    <div key={message.id} className="flex justify-end">
+                      <div className="max-w-[85%] rounded-2xl bg-primary px-4 py-3 text-sm leading-6 text-primary-foreground shadow-xs">
+                        <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="w-full max-w-3xl">
+                <div className="mx-auto max-w-2xl text-center">
+                  <div className="text-3xl font-semibold tracking-tight md:text-4xl">
+                    {t(locale, 'emptyState', 'heroTitle')}
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-muted-foreground">
+                    {t(locale, 'emptyState', 'heroSubtitle')}
+                  </div>
+                </div>
+
+                <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-3">
+                  {[
+                    t(locale, 'emptyState', 'example1'),
+                    t(locale, 'emptyState', 'example2'),
+                    t(locale, 'emptyState', 'example3'),
+                    t(locale, 'emptyState', 'example4'),
+                    t(locale, 'emptyState', 'example5'),
+                    t(locale, 'emptyState', 'example6'),
+                  ].map((example) => (
+                    <div
+                      key={example}
+                      className="rounded-full border border-border/60 bg-muted/20 px-4 py-2 text-sm text-foreground"
+                    >
+                      {example}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -250,21 +318,42 @@ function AppShellMain({ currentChat, locale }: AppShellMainProps) {
 
         <div className="sticky bottom-0 pb-6 pt-4 md:pb-8">
           <div className="mx-auto w-full max-w-3xl bg-background/95 supports-[backdrop-filter]:bg-background/80">
-            {/* Static input entry placeholder: looks like a real composer but has no interaction. */}
-            {/* This block is focusable for realistic affordance, but remains non-editable (static only). */}
-            <div
-              role="textbox"
-              aria-readonly="true"
-              aria-label={t(locale, 'emptyState', 'inputPlaceholder')}
-              tabIndex={0}
-              className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-background/70 px-4 py-3 shadow-xs outline-none transition-colors hover:bg-background/80 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
-            >
-              <Sparkles className="size-4 text-muted-foreground" />
-              <div className="flex-1 truncate text-sm text-muted-foreground">
-                {t(locale, 'emptyState', 'inputPlaceholder')}
-              </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
-                <ArrowUp className="size-4" />
+            {/* Keep the composer minimal: local-only input that appends a user message to the active chat. */}
+            <div className="rounded-2xl border border-border/60 bg-background/80 p-3 shadow-xs backdrop-blur-sm">
+              <Textarea
+                aria-label={t(locale, 'emptyState', 'inputPlaceholder')}
+                className="min-h-24 resize-none border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
+                disabled={!currentChat}
+                onChange={(event) => onComposerChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    onSendMessage()
+                  }
+                }}
+                placeholder={
+                  currentChat
+                    ? t(locale, 'emptyState', 'inputPlaceholder')
+                    : t(locale, 'emptyState', 'emptyComposerGuard')
+                }
+                value={composerValue}
+              />
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="text-xs text-muted-foreground">
+                  {currentChat
+                    ? t(locale, 'emptyState', 'composerDescription')
+                    : t(locale, 'emptyState', 'emptyComposerGuard')}
+                </div>
+                <Button
+                  aria-label={t(locale, 'emptyState', 'sendButtonLabel')}
+                  className="rounded-full"
+                  disabled={!currentChat || composerValue.trim().length === 0}
+                  onClick={onSendMessage}
+                  size="icon-sm"
+                  type="button"
+                >
+                  <ArrowUp className="size-4" />
+                </Button>
               </div>
             </div>
           </div>
