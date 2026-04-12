@@ -38,7 +38,7 @@ export default function RootLayout({
         {/* Theme is mounted at the highest shared level so all pages/components can rely on it. */}
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="light"
           enableSystem
           disableTransitionOnChange
         >
