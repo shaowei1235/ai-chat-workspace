@@ -7,6 +7,7 @@ import type { Chat } from '@/types/chat'
 
 type AppShellMainProps = {
   currentChat: Chat | null
+  generatingMessageId: string | null
   inputValue: string
   isCurrentChatGenerating: boolean
   isGenerating: boolean
@@ -18,6 +19,7 @@ type AppShellMainProps = {
 
 export function AppShellMain({
   currentChat,
+  generatingMessageId,
   inputValue,
   isCurrentChatGenerating,
   isGenerating,
@@ -64,64 +66,59 @@ export function AppShellMain({
                 </div>
               ) : (
                 <div className="flex-1 space-y-4">
-                  {currentChat.messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        'flex',
-                        message.role === 'user' ? 'justify-end' : 'justify-start',
-                      )}
-                    >
-                      <div className="max-w-[85%] space-y-2">
-                        <div
-                          className={cn(
-                            'text-xs font-medium',
-                            message.role === 'user'
-                              ? 'text-right text-primary'
-                              : 'text-left text-muted-foreground',
-                          )}
-                        >
-                          {message.role === 'user'
-                            ? t(locale, 'emptyState', 'userRoleLabel')
-                            : t(locale, 'emptyState', 'assistantRoleLabel')}
-                        </div>
-                        <div
-                          className={cn(
-                            'rounded-2xl px-4 py-3 text-sm leading-6 shadow-xs',
-                            message.role === 'user'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'border border-border/60 bg-muted/30 text-foreground dark:bg-muted/20',
-                          )}
-                        >
-                          <div className="whitespace-pre-wrap break-words">
-                            {message.content}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {currentChat.messages.map((message) => {
+                    const isGeneratingMessage = message.id === generatingMessageId
 
-                  {isCurrentChatGenerating ? (
-                    <div className="flex justify-start">
-                      <div className="max-w-[85%] space-y-2">
-                        <div className="text-xs font-medium text-left text-muted-foreground">
-                          {t(locale, 'emptyState', 'assistantRoleLabel')}
-                        </div>
-                        <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-foreground shadow-xs dark:bg-muted/20">
-                          <div className="flex items-center gap-2">
-                            <div className="flex gap-1">
-                              <span className="size-1.5 rounded-full bg-muted-foreground/60" />
-                              <span className="size-1.5 rounded-full bg-muted-foreground/60" />
-                              <span className="size-1.5 rounded-full bg-muted-foreground/60" />
-                            </div>
-                            <span className="text-muted-foreground">
-                              {t(locale, 'emptyState', 'pendingReplyLabel')}
-                            </span>
+                    return (
+                      <div
+                        key={message.id}
+                        className={cn(
+                          'flex',
+                          message.role === 'user' ? 'justify-end' : 'justify-start',
+                        )}
+                      >
+                        <div className="max-w-[85%] space-y-2">
+                          <div
+                            className={cn(
+                              'text-xs font-medium',
+                              message.role === 'user'
+                                ? 'text-right text-primary'
+                                : 'text-left text-muted-foreground',
+                            )}
+                          >
+                            {message.role === 'user'
+                              ? t(locale, 'emptyState', 'userRoleLabel')
+                              : t(locale, 'emptyState', 'assistantRoleLabel')}
+                          </div>
+                          <div
+                            className={cn(
+                              'rounded-2xl px-4 py-3 text-sm leading-6 shadow-xs',
+                              message.role === 'user'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'border border-border/60 bg-muted/30 text-foreground dark:bg-muted/20',
+                            )}
+                          >
+                            {isGeneratingMessage && message.content.length === 0 ? (
+                              <div className="flex items-center gap-2">
+                                <div className="flex gap-1">
+                                  <span className="size-1.5 rounded-full bg-muted-foreground/60" />
+                                  <span className="size-1.5 rounded-full bg-muted-foreground/60" />
+                                  <span className="size-1.5 rounded-full bg-muted-foreground/60" />
+                                </div>
+                                <span className="text-muted-foreground">
+                                  {t(locale, 'emptyState', 'pendingReplyLabel')}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="whitespace-pre-wrap break-words">
+                                {message.content}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ) : null}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -161,7 +158,7 @@ export function AppShellMain({
 
         <div className="sticky bottom-0 pb-6 pt-4 md:pb-8">
           <div className="mx-auto w-full max-w-3xl bg-background/95 supports-[backdrop-filter]:bg-background/80">
-            {/* Keep the input area minimal: disable submit while one AI reply is in flight. */}
+            {/* Keep the input area minimal: disable submit while one assistant reply is streaming. */}
             <div className="rounded-2xl border border-border/60 bg-background/80 p-3 shadow-xs backdrop-blur-sm">
               <Textarea
                 aria-label={t(locale, 'emptyState', 'inputPlaceholder')}

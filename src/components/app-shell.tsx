@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { t, type Locale } from '@/i18n/messages'
 import { AppShellMain } from '@/components/app-shell-main'
 import { AppShellSidebar } from '@/components/app-shell-sidebar'
@@ -10,29 +10,24 @@ type AppShellProps = {
   locale: Locale
 }
 
-const LOCAL_REQUEST_ERROR_LOG = '获取 AI 回复失败'
+const LOCAL_REQUEST_ERROR_LOG = '获取 AI 流式回复失败'
+const LOCAL_STREAM_PARSE_ERROR = '流式响应解析失败'
 
 export function AppShell({ locale }: AppShellProps) {
   // Keep local state in the shell so Sidebar and Main read from the same source of truth.
   const [chats, setChats] = useState<Chat[]>([])
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const [generatingChatId, setGeneratingChatId] = useState<string | null>(null)
+  const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(
+    null,
+  )
   const [inputValue, setInputValue] = useState('')
   const [requestError, setRequestError] = useState<string | null>(null)
-  const pendingDelayRef = useRef<number | null>(null)
 
   const currentChat = chats.find((chat) => chat.id === currentChatId) ?? null
   const isGenerating = generatingChatId !== null
   const isCurrentChatGenerating =
     currentChat !== null && currentChat.id === generatingChatId
-
-  useEffect(() => {
-    return () => {
-      if (pendingDelayRef.current !== null) {
-        window.clearTimeout(pendingDelayRef.current)
-      }
-    }
-  }, [])
 
   function handleCreateChat() {
     const createdChat: Chat = {
@@ -56,16 +51,46 @@ export function AppShell({ locale }: AppShellProps) {
     setInputValue(nextValue)
   }
 
-  async function waitForPendingDelay() {
-    await new Promise<void>((resolve) => {
-      pendingDelayRef.current = window.setTimeout(() => {
-        pendingDelayRef.current = null
-        resolve()
-      }, 300)
-    })
+  function updateAssistantMessageContent(
+    targetChatId: string,
+    assistantMessageId: string,
+    content: string,
+  ) {
+    setChats((previousChats) =>
+      previousChats.map((chat) =>
+        chat.id === targetChatId
+          ? {
+              ...chat,
+              messages: chat.messages.map((message) =>
+                message.id === assistantMessageId
+                  ? {
+                      ...message,
+                      content,
+                    }
+                  : message,
+              ),
+            }
+          : chat,
+      ),
+    )
   }
 
-  async function requestAssistantReply(messages: ChatMessage[]) {
+  function finalizeAssistantMessageAsError(
+    targetChatId: string,
+    assistantMessageId: string,
+  ) {
+    updateAssistantMessageContent(
+      targetChatId,
+      assistantMessageId,
+      t(locale, 'emptyState', 'requestErrorMessage'),
+    )
+  }
+
+  async function streamAssistantReply(
+    messages: ChatMessage[],
+    targetChatId: string,
+    assistantMessageId: string,
+  ) {
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: {
@@ -74,25 +99,65 @@ export function AppShell({ locale }: AppShellProps) {
       body: JSON.stringify({ messages }),
     })
 
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
       throw new Error(`聊天请求失败: ${response.status}`)
     }
 
-    const data = (await response.json()) as {
-      content?: string
-    }
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let nextContent = ''
 
-    if (!data.content) {
-      throw new Error('聊天接口未返回内容')
-    }
+    while (true) {
+      const { done, value } = await reader.read()
 
-    return data.content
+      if (done) {
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+      const eventChunks = buffer.split('\n\n')
+      buffer = eventChunks.pop() ?? ''
+
+      for (const chunk of eventChunks) {
+        const lines = chunk.split('\n')
+        const eventName = lines
+          .find((line) => line.startsWith('event: '))
+          ?.slice(7)
+          .trim()
+        const data = lines
+          .filter((line) => line.startsWith('data: '))
+          .map((line) => line.slice(6))
+          .join('\n')
+
+        if (!eventName) {
+          continue
+        }
+
+        if (eventName === 'delta') {
+          nextContent += data
+          updateAssistantMessageContent(
+            targetChatId,
+            assistantMessageId,
+            nextContent,
+          )
+        }
+
+        if (eventName === 'error') {
+          throw new Error(data || LOCAL_STREAM_PARSE_ERROR)
+        }
+
+        if (eventName === 'done') {
+          return
+        }
+      }
+    }
   }
 
   async function handleSendMessage() {
     const trimmedValue = inputValue.trim()
 
-    if (!currentChatId || trimmedValue.length === 0 || isGenerating) {
+    if (!currentChatId || !currentChat || trimmedValue.length === 0 || isGenerating) {
       return
     }
 
@@ -103,8 +168,17 @@ export function AppShell({ locale }: AppShellProps) {
       content: trimmedValue,
       createdAt: new Date().toISOString(),
     }
-
-    let nextMessagesForRequest: ChatMessage[] = []
+    const assistantMessageId = crypto.randomUUID()
+    const assistantPlaceholder: ChatMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      createdAt: new Date().toISOString(),
+    }
+    const nextMessagesForRequest: ChatMessage[] = [
+      ...currentChat.messages,
+      userMessage,
+    ]
 
     setChats((previousChats) =>
       previousChats.map((chat) => {
@@ -112,45 +186,31 @@ export function AppShell({ locale }: AppShellProps) {
           return chat
         }
 
-        nextMessagesForRequest = [...chat.messages, userMessage]
-
         return {
           ...chat,
-          messages: nextMessagesForRequest,
+          messages: [...nextMessagesForRequest, assistantPlaceholder],
         }
       }),
     )
 
     setRequestError(null)
     setGeneratingChatId(targetChatId)
+    setGeneratingMessageId(assistantMessageId)
     setInputValue('')
 
     try {
-      await waitForPendingDelay()
-
-      const assistantContent = await requestAssistantReply(nextMessagesForRequest)
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: assistantContent,
-        createdAt: new Date().toISOString(),
-      }
-
-      setChats((previousChats) =>
-        previousChats.map((chat) =>
-          chat.id === targetChatId
-            ? {
-                ...chat,
-                messages: [...chat.messages, assistantMessage],
-              }
-            : chat,
-        ),
+      await streamAssistantReply(
+        nextMessagesForRequest,
+        targetChatId,
+        assistantMessageId,
       )
     } catch (error) {
       console.error(LOCAL_REQUEST_ERROR_LOG, error)
+      finalizeAssistantMessageAsError(targetChatId, assistantMessageId)
       setRequestError(t(locale, 'emptyState', 'requestErrorMessage'))
     } finally {
       setGeneratingChatId(null)
+      setGeneratingMessageId(null)
     }
   }
 
@@ -165,6 +225,7 @@ export function AppShell({ locale }: AppShellProps) {
       />
       <AppShellMain
         currentChat={currentChat}
+        generatingMessageId={generatingMessageId}
         inputValue={inputValue}
         isCurrentChatGenerating={isCurrentChatGenerating}
         isGenerating={isGenerating}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { generateAssistantReply } from '@/lib/ai/openai'
+import { streamAssistantReply } from '@/lib/ai/openai'
 import type { ChatMessage } from '@/types/chat'
 
 type ChatRouteBody = {
@@ -40,11 +40,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const result = await generateAssistantReply({ messages })
+    const stream = await streamAssistantReply({ messages })
 
-    return NextResponse.json(result)
+    return new Response(stream, {
+      headers: {
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'Content-Type': 'text/event-stream; charset=utf-8',
+      },
+    })
   } catch (error) {
-    console.error('聊天接口请求失败', error)
+    console.error('聊天接口流式请求失败', error)
 
     return NextResponse.json(
       { error: 'ASSISTANT_REPLY_FAILED' },

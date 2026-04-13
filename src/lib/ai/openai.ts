@@ -8,24 +8,16 @@ type OpenAIMessageInput = {
   }>
 }
 
-export type GenerateAssistantReplyParams = {
+export type StreamAssistantReplyParams = {
   messages: ChatMessage[]
 }
 
-export type GenerateAssistantReplyResult = {
-  content: string
-}
-
-type OpenAIResponsesResponse = {
-  output?: Array<{
-    type?: string
-    role?: string
-    content?: Array<{
-      type?: string
-      text?: string
-    }>
-  }>
-  output_text?: string
+type OpenAIStreamingEvent = {
+  type?: string
+  delta?: string
+  error?: {
+    message?: string
+  }
 }
 
 function getOpenAIConfig() {
@@ -47,7 +39,6 @@ function mapMessagesToResponsesInput(
     role: message.role,
     content: [
       {
-        // Responses API expects assistant history to be represented as output_text.
         type: message.role === 'assistant' ? 'output_text' : 'input_text',
         text: message.content,
       },
@@ -55,12 +46,32 @@ function mapMessagesToResponsesInput(
   }))
 }
 
-export async function generateAssistantReply({
+function encodeSseEvent(event: string, data: string) {
+  return `event: ${event}\ndata: ${data}\n\n`
+}
+
+function parseSseChunk(chunk: string) {
+  return chunk
+    .split('\n\n')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const dataLines = entry
+        .split('\n')
+        .filter((line) => line.startsWith('data: '))
+        .map((line) => line.slice(6))
+
+      return dataLines.join('\n')
+    })
+    .filter(Boolean)
+}
+
+export async function streamAssistantReply({
   messages,
-}: GenerateAssistantReplyParams): Promise<GenerateAssistantReplyResult> {
+}: StreamAssistantReplyParams): Promise<ReadableStream<Uint8Array>> {
   const { apiKey, model } = getOpenAIConfig()
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const openAIResponse = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -68,30 +79,88 @@ export async function generateAssistantReply({
     },
     body: JSON.stringify({
       model,
+      stream: true,
       input: mapMessagesToResponsesInput(messages),
     }),
   })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`OpenAI 请求失败: ${response.status} ${errorText}`)
+  if (!openAIResponse.ok || !openAIResponse.body) {
+    const errorText = await openAIResponse.text()
+    throw new Error(`OpenAI 请求失败: ${openAIResponse.status} ${errorText}`)
   }
 
-  const data = (await response.json()) as OpenAIResponsesResponse
-  const content =
-    data.output_text ??
-    data.output
-      ?.flatMap((item) => item.content ?? [])
-      .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
-      .map((item) => item.text ?? '')
-      .join('\n')
-      .trim()
+  const decoder = new TextDecoder()
+  const encoder = new TextEncoder()
+  const reader = openAIResponse.body.getReader()
+  let buffer = ''
 
-  if (!content) {
-    throw new Error('OpenAI 未返回可用文本')
-  }
+  // Convert OpenAI's event stream into a smaller app-level event stream for the client.
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
 
-  return {
-    content,
-  }
+          if (done) {
+            controller.enqueue(encoder.encode(encodeSseEvent('done', '')))
+            break
+          }
+
+          buffer += decoder.decode(value, { stream: true })
+          const parts = buffer.split('\n\n')
+          buffer = parts.pop() ?? ''
+
+          for (const part of parts) {
+            for (const dataLine of parseSseChunk(part)) {
+              if (dataLine === '[DONE]') {
+                controller.enqueue(encoder.encode(encodeSseEvent('done', '')))
+                controller.close()
+                return
+              }
+
+              const event = JSON.parse(dataLine) as OpenAIStreamingEvent
+
+              if (event.type === 'response.output_text.delta' && event.delta) {
+                controller.enqueue(
+                  encoder.encode(encodeSseEvent('delta', event.delta)),
+                )
+              }
+
+              if (event.type === 'response.completed') {
+                controller.enqueue(encoder.encode(encodeSseEvent('done', '')))
+              }
+
+              if (
+                event.type === 'response.failed' ||
+                event.type === 'error'
+              ) {
+                controller.enqueue(
+                  encoder.encode(
+                    encodeSseEvent(
+                      'error',
+                      event.error?.message ?? 'AI 流式回复失败',
+                    ),
+                  ),
+                )
+              }
+            }
+          }
+        }
+
+        controller.close()
+      } catch (error) {
+        controller.enqueue(
+          encoder.encode(
+            encodeSseEvent(
+              'error',
+              error instanceof Error ? error.message : 'AI 流式回复失败',
+            ),
+          ),
+        )
+        controller.close()
+      } finally {
+        reader.releaseLock()
+      }
+    },
+  })
 }
