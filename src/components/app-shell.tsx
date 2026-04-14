@@ -4,19 +4,44 @@ import { useState } from 'react'
 import { t, type Locale } from '@/i18n/messages'
 import { AppShellMain } from '@/components/app-shell-main'
 import { AppShellSidebar } from '@/components/app-shell-sidebar'
-import type { Chat, ChatMessage } from '@/types/chat'
+import type { Chat, ChatMessage, ChatSummary } from '@/types/chat'
 
 type AppShellProps = {
+  initialChatSummaries: ChatSummary[]
+  initialCurrentChat: Chat | null
   locale: Locale
+}
+
+type ChatsResponse = {
+  chats: ChatSummary[]
+}
+
+type ChatResponse = {
+  chat: Chat
 }
 
 const LOCAL_REQUEST_ERROR_LOG = '获取 AI 流式回复失败'
 const LOCAL_STREAM_PARSE_ERROR = '流式响应解析失败'
 
-export function AppShell({ locale }: AppShellProps) {
-  // Keep local state in the shell so Sidebar and Main read from the same source of truth.
-  const [chats, setChats] = useState<Chat[]>([])
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+function sortChatSummaries(chats: ChatSummary[]) {
+  return [...chats].sort(
+    (left, right) =>
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  )
+}
+
+export function AppShell({
+  initialChatSummaries,
+  initialCurrentChat,
+  locale,
+}: AppShellProps) {
+  const [chatSummaries, setChatSummaries] = useState<ChatSummary[]>(
+    sortChatSummaries(initialChatSummaries),
+  )
+  const [currentChatId, setCurrentChatId] = useState<string | null>(
+    initialCurrentChat?.id ?? initialChatSummaries[0]?.id ?? null,
+  )
+  const [currentChat, setCurrentChat] = useState<Chat | null>(initialCurrentChat)
   const [generatingChatId, setGeneratingChatId] = useState<string | null>(null)
   const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(
     null,
@@ -24,31 +49,84 @@ export function AppShell({ locale }: AppShellProps) {
   const [inputValue, setInputValue] = useState('')
   const [requestError, setRequestError] = useState<string | null>(null)
 
-  const currentChat = chats.find((chat) => chat.id === currentChatId) ?? null
   const isGenerating = generatingChatId !== null
   const isCurrentChatGenerating =
     currentChat !== null && currentChat.id === generatingChatId
 
-  function handleCreateChat() {
-    const createdChat: Chat = {
-      id: crypto.randomUUID(),
-      title: `${t(locale, 'sidebar', 'newChatDefaultTitle')} ${chats.length + 1}`,
-      createdAt: new Date().toISOString(),
-      messages: [],
+  async function readJson<T>(response: Response): Promise<T> {
+    if (!response.ok) {
+      throw new Error(`请求失败: ${response.status}`)
     }
 
-    setChats((previousChats) => [createdChat, ...previousChats])
-    setCurrentChatId(createdChat.id)
-    setRequestError(null)
+    return (await response.json()) as T
   }
 
-  function handleSelectChat(chatId: string) {
+  async function refreshChatList() {
+    const response = await fetch('/api/chats', {
+      method: 'GET',
+      cache: 'no-store',
+    })
+    const data = await readJson<ChatsResponse>(response)
+
+    setChatSummaries(sortChatSummaries(data.chats))
+  }
+
+  async function loadChat(chatId: string) {
+    const response = await fetch(`/api/chats/${chatId}`, {
+      method: 'GET',
+      cache: 'no-store',
+    })
+    const data = await readJson<ChatResponse>(response)
+
     setCurrentChatId(chatId)
-    setRequestError(null)
+    setCurrentChat(data.chat)
   }
 
   function handleInputChange(nextValue: string) {
     setInputValue(nextValue)
+  }
+
+  async function handleCreateChat() {
+    try {
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: `${t(locale, 'sidebar', 'newChatDefaultTitle')} ${chatSummaries.length + 1}`,
+        }),
+      })
+      const data = await readJson<ChatResponse>(response)
+
+      setCurrentChatId(data.chat.id)
+      setCurrentChat(data.chat)
+      setChatSummaries((previousChats) =>
+        sortChatSummaries([
+          {
+            id: data.chat.id,
+            title: data.chat.title,
+            createdAt: data.chat.createdAt,
+            updatedAt: data.chat.updatedAt,
+          },
+          ...previousChats.filter((chat) => chat.id !== data.chat.id),
+        ]),
+      )
+      setRequestError(null)
+    } catch (error) {
+      console.error('创建数据库对话失败', error)
+      setRequestError(t(locale, 'emptyState', 'requestErrorMessage'))
+    }
+  }
+
+  async function handleSelectChat(chatId: string) {
+    try {
+      setRequestError(null)
+      await loadChat(chatId)
+    } catch (error) {
+      console.error('加载数据库对话失败', error)
+      setRequestError(t(locale, 'emptyState', 'requestErrorMessage'))
+    }
   }
 
   function updateAssistantMessageContent(
@@ -56,23 +134,23 @@ export function AppShell({ locale }: AppShellProps) {
     assistantMessageId: string,
     content: string,
   ) {
-    setChats((previousChats) =>
-      previousChats.map((chat) =>
-        chat.id === targetChatId
-          ? {
-              ...chat,
-              messages: chat.messages.map((message) =>
-                message.id === assistantMessageId
-                  ? {
-                      ...message,
-                      content,
-                    }
-                  : message,
-              ),
-            }
-          : chat,
-      ),
-    )
+    setCurrentChat((previousChat) => {
+      if (!previousChat || previousChat.id !== targetChatId) {
+        return previousChat
+      }
+
+      return {
+        ...previousChat,
+        messages: previousChat.messages.map((message) =>
+          message.id === assistantMessageId
+            ? {
+                ...message,
+                content,
+              }
+            : message,
+        ),
+      }
+    })
   }
 
   function finalizeAssistantMessageAsError(
@@ -87,8 +165,8 @@ export function AppShell({ locale }: AppShellProps) {
   }
 
   async function streamAssistantReply(
-    messages: ChatMessage[],
-    targetChatId: string,
+    chatId: string,
+    content: string,
     assistantMessageId: string,
   ) {
     const response = await fetch('/api/chat', {
@@ -96,7 +174,7 @@ export function AppShell({ locale }: AppShellProps) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ chatId, content }),
     })
 
     if (!response.ok || !response.body) {
@@ -136,11 +214,7 @@ export function AppShell({ locale }: AppShellProps) {
 
         if (eventName === 'delta') {
           nextContent += data
-          updateAssistantMessageContent(
-            targetChatId,
-            assistantMessageId,
-            nextContent,
-          )
+          updateAssistantMessageContent(chatId, assistantMessageId, nextContent)
         }
 
         if (eventName === 'error') {
@@ -162,11 +236,12 @@ export function AppShell({ locale }: AppShellProps) {
     }
 
     const targetChatId = currentChatId
+    const now = new Date().toISOString()
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: trimmedValue,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
     }
     const assistantMessageId = crypto.randomUUID()
     const assistantPlaceholder: ChatMessage = {
@@ -175,22 +250,29 @@ export function AppShell({ locale }: AppShellProps) {
       content: '',
       createdAt: new Date().toISOString(),
     }
-    const nextMessagesForRequest: ChatMessage[] = [
-      ...currentChat.messages,
-      userMessage,
-    ]
 
-    setChats((previousChats) =>
-      previousChats.map((chat) => {
-        if (chat.id !== targetChatId) {
-          return chat
-        }
+    setCurrentChat((previousChat) => {
+      if (!previousChat || previousChat.id !== targetChatId) {
+        return previousChat
+      }
 
-        return {
-          ...chat,
-          messages: [...nextMessagesForRequest, assistantPlaceholder],
-        }
-      }),
+      return {
+        ...previousChat,
+        updatedAt: now,
+        messages: [...previousChat.messages, userMessage, assistantPlaceholder],
+      }
+    })
+    setChatSummaries((previousChats) =>
+      sortChatSummaries(
+        previousChats.map((chat) =>
+          chat.id === targetChatId
+            ? {
+                ...chat,
+                updatedAt: now,
+              }
+            : chat,
+        ),
+      ),
     )
 
     setRequestError(null)
@@ -199,11 +281,8 @@ export function AppShell({ locale }: AppShellProps) {
     setInputValue('')
 
     try {
-      await streamAssistantReply(
-        nextMessagesForRequest,
-        targetChatId,
-        assistantMessageId,
-      )
+      await streamAssistantReply(targetChatId, trimmedValue, assistantMessageId)
+      await Promise.all([refreshChatList(), loadChat(targetChatId)])
     } catch (error) {
       console.error(LOCAL_REQUEST_ERROR_LOG, error)
       finalizeAssistantMessageAsError(targetChatId, assistantMessageId)
@@ -217,7 +296,7 @@ export function AppShell({ locale }: AppShellProps) {
   return (
     <div className="flex min-h-dvh flex-col bg-background md:flex-row">
       <AppShellSidebar
-        chats={chats}
+        chats={chatSummaries}
         currentChatId={currentChatId}
         locale={locale}
         onCreateChat={handleCreateChat}

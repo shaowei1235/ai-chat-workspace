@@ -1,3 +1,4 @@
+import { ChatExampleGuide } from '@/components/chat-example-guide'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowUp } from 'lucide-react'
@@ -47,34 +48,31 @@ export function AppShellMain({
         <section className="flex flex-1 flex-col py-8">
           {currentChat ? (
             <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
-              <div className="pb-4">
-                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                  {t(locale, 'emptyState', 'messageAreaLabel')}
-                </div>
-              </div>
-
               {currentChat.messages.length === 0 && !isCurrentChatGenerating ? (
                 <div className="flex flex-1 items-center justify-center">
-                  <div className="mx-auto max-w-2xl rounded-2xl border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
-                    <div className="text-2xl font-semibold tracking-tight">
-                      {t(locale, 'emptyState', 'emptyChatTitle')}
-                    </div>
-                    <div className="mt-3 text-sm leading-6 text-muted-foreground">
-                      {t(locale, 'emptyState', 'emptyChatDescription')}
-                    </div>
-                  </div>
+                  <ChatExampleGuide
+                    description={t(
+                      locale,
+                      'emptyState',
+                      'emptyChatDescription',
+                    )}
+                    locale={locale}
+                  />
                 </div>
               ) : (
                 <div className="flex-1 space-y-4">
                   {currentChat.messages.map((message) => {
-                    const isGeneratingMessage = message.id === generatingMessageId
+                    const isGeneratingMessage =
+                      message.id === generatingMessageId
 
                     return (
                       <div
                         key={message.id}
                         className={cn(
                           'flex',
-                          message.role === 'user' ? 'justify-end' : 'justify-start',
+                          message.role === 'user'
+                            ? 'justify-end'
+                            : 'justify-start',
                         )}
                       >
                         <div className="max-w-[85%] space-y-2">
@@ -98,7 +96,8 @@ export function AppShellMain({
                                 : 'border border-border/60 bg-muted/30 text-foreground dark:bg-muted/20',
                             )}
                           >
-                            {isGeneratingMessage && message.content.length === 0 ? (
+                            {isGeneratingMessage &&
+                            message.content.length === 0 ? (
                               <div className="flex items-center gap-2">
                                 <div className="flex gap-1">
                                   <span className="size-1.5 rounded-full bg-muted-foreground/60" />
@@ -124,34 +123,10 @@ export function AppShellMain({
             </div>
           ) : (
             <div className="flex flex-1 items-center justify-center">
-              <div className="w-full max-w-3xl">
-                <div className="mx-auto max-w-2xl text-center">
-                  <div className="text-3xl font-semibold tracking-tight md:text-4xl">
-                    {t(locale, 'emptyState', 'heroTitle')}
-                  </div>
-                  <div className="mt-3 text-sm leading-6 text-muted-foreground">
-                    {t(locale, 'emptyState', 'heroSubtitle')}
-                  </div>
-                </div>
-
-                <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-3">
-                  {[
-                    t(locale, 'emptyState', 'example1'),
-                    t(locale, 'emptyState', 'example2'),
-                    t(locale, 'emptyState', 'example3'),
-                    t(locale, 'emptyState', 'example4'),
-                    t(locale, 'emptyState', 'example5'),
-                    t(locale, 'emptyState', 'example6'),
-                  ].map((example) => (
-                    <div
-                      key={example}
-                      className="rounded-full border border-border/60 bg-muted/20 px-4 py-2 text-sm text-foreground"
-                    >
-                      {example}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <ChatExampleGuide
+                description={t(locale, 'emptyState', 'heroSubtitle')}
+                locale={locale}
+              />
             </div>
           )}
         </section>
@@ -196,7 +171,11 @@ export function AppShellMain({
                 <Button
                   aria-label={t(locale, 'emptyState', 'sendButtonLabel')}
                   className="rounded-full"
-                  disabled={!currentChat || isGenerating || inputValue.trim().length === 0}
+                  disabled={
+                    !currentChat ||
+                    isGenerating ||
+                    inputValue.trim().length === 0
+                  }
                   onClick={onSendMessage}
                   size="icon-sm"
                   type="button"

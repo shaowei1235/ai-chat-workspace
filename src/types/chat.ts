@@ -13,5 +13,13 @@ export type Chat = {
   title: string
   // Keep timestamps serializable so the shape can move to API/database boundaries later.
   createdAt: string
+  updatedAt: string
   messages: ChatMessage[]
+}
+
+export type ChatSummary = {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
 }

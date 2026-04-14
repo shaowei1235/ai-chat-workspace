@@ -2,10 +2,10 @@ import { Button } from '@/components/ui/button'
 import { MessageSquare, Plus, UserCircle2 } from 'lucide-react'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
-import type { Chat } from '@/types/chat'
+import type { ChatSummary } from '@/types/chat'
 
 type AppShellSidebarProps = {
-  chats: Chat[]
+  chats: ChatSummary[]
   currentChatId: string | null
   locale: Locale
   onCreateChat: () => void
@@ -93,7 +93,7 @@ export function AppShellSidebar({
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium">{chat.title}</div>
                           <div className="truncate text-xs text-muted-foreground">
-                            {formatChatCreatedAt(locale, chat.createdAt)}
+                            {formatChatCreatedAt(locale, chat.updatedAt)}
                           </div>
                         </div>
                       </button>

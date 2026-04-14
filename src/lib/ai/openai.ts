@@ -10,6 +10,9 @@ type OpenAIMessageInput = {
 
 export type StreamAssistantReplyParams = {
   messages: ChatMessage[]
+  onDelta?: (delta: string) => void | Promise<void>
+  onComplete?: () => void | Promise<void>
+  onError?: (message: string) => void | Promise<void>
 }
 
 type OpenAIStreamingEvent = {
@@ -68,6 +71,9 @@ function parseSseChunk(chunk: string) {
 
 export async function streamAssistantReply({
   messages,
+  onDelta,
+  onComplete,
+  onError,
 }: StreamAssistantReplyParams): Promise<ReadableStream<Uint8Array>> {
   const { apiKey, model } = getOpenAIConfig()
 
@@ -93,6 +99,7 @@ export async function streamAssistantReply({
   const encoder = new TextEncoder()
   const reader = openAIResponse.body.getReader()
   let buffer = ''
+  let didComplete = false
 
   // Convert OpenAI's event stream into a smaller app-level event stream for the client.
   return new ReadableStream<Uint8Array>({
@@ -113,6 +120,10 @@ export async function streamAssistantReply({
           for (const part of parts) {
             for (const dataLine of parseSseChunk(part)) {
               if (dataLine === '[DONE]') {
+                if (!didComplete) {
+                  didComplete = true
+                  await onComplete?.()
+                }
                 controller.enqueue(encoder.encode(encodeSseEvent('done', '')))
                 controller.close()
                 return
@@ -121,12 +132,17 @@ export async function streamAssistantReply({
               const event = JSON.parse(dataLine) as OpenAIStreamingEvent
 
               if (event.type === 'response.output_text.delta' && event.delta) {
+                await onDelta?.(event.delta)
                 controller.enqueue(
                   encoder.encode(encodeSseEvent('delta', event.delta)),
                 )
               }
 
               if (event.type === 'response.completed') {
+                if (!didComplete) {
+                  didComplete = true
+                  await onComplete?.()
+                }
                 controller.enqueue(encoder.encode(encodeSseEvent('done', '')))
               }
 
@@ -134,12 +150,11 @@ export async function streamAssistantReply({
                 event.type === 'response.failed' ||
                 event.type === 'error'
               ) {
+                const message = event.error?.message ?? 'AI 流式回复失败'
+                await onError?.(message)
                 controller.enqueue(
                   encoder.encode(
-                    encodeSseEvent(
-                      'error',
-                      event.error?.message ?? 'AI 流式回复失败',
-                    ),
+                    encodeSseEvent('error', message),
                   ),
                 )
               }
@@ -147,14 +162,18 @@ export async function streamAssistantReply({
           }
         }
 
+        if (!didComplete) {
+          didComplete = true
+          await onComplete?.()
+        }
         controller.close()
       } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'AI 流式回复失败'
+        await onError?.(message)
         controller.enqueue(
           encoder.encode(
-            encodeSseEvent(
-              'error',
-              error instanceof Error ? error.message : 'AI 流式回复失败',
-            ),
+            encodeSseEvent('error', message),
           ),
         )
         controller.close()

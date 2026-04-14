@@ -1,9 +1,18 @@
 import { AppShell } from '@/components/app-shell'
+import { getChatById, listChatSummaries } from '@/features/chat/chat-data'
 import { getLocale } from '@/i18n/get-locale'
 
 export default async function Home() {
-  // The Home route now renders the static App Shell to establish the product-like frame early.
   const locale = await getLocale()
+  const chats = await listChatSummaries()
+  const initialCurrentChat =
+    chats.length > 0 ? await getChatById(chats[0].id) : null
 
-  return <AppShell locale={locale} />
+  return (
+    <AppShell
+      initialChatSummaries={chats}
+      initialCurrentChat={initialCurrentChat}
+      locale={locale}
+    />
+  )
 }

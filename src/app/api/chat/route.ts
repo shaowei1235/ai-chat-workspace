@@ -1,46 +1,62 @@
 import { NextResponse } from 'next/server'
+import {
+  createMessage,
+  getChatById,
+  listMessagesByChatId,
+} from '@/features/chat/chat-data'
 import { streamAssistantReply } from '@/lib/ai/openai'
-import type { ChatMessage } from '@/types/chat'
 
 type ChatRouteBody = {
-  messages?: ChatMessage[]
-}
-
-function isChatMessage(value: unknown): value is ChatMessage {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-
-  const candidate = value as Record<string, unknown>
-
-  return (
-    typeof candidate.id === 'string' &&
-    (candidate.role === 'user' || candidate.role === 'assistant') &&
-    typeof candidate.content === 'string' &&
-    typeof candidate.createdAt === 'string'
-  )
+  chatId?: string
+  content?: string
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ChatRouteBody
-    const messages = body.messages
+    const chatId = body.chatId
+    const content = body.content?.trim()
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        { error: 'INVALID_MESSAGES' },
-        { status: 400 },
-      )
+    if (typeof chatId !== 'string' || chatId.length === 0) {
+      return NextResponse.json({ error: 'INVALID_CHAT_ID' }, { status: 400 })
     }
 
-    if (!messages.every(isChatMessage)) {
-      return NextResponse.json(
-        { error: 'INVALID_MESSAGE_SHAPE' },
-        { status: 400 },
-      )
+    if (!content) {
+      return NextResponse.json({ error: 'INVALID_MESSAGE_CONTENT' }, { status: 400 })
     }
 
-    const stream = await streamAssistantReply({ messages })
+    const existingChat = await getChatById(chatId)
+
+    if (!existingChat) {
+      return NextResponse.json({ error: 'CHAT_NOT_FOUND' }, { status: 404 })
+    }
+
+    await createMessage({
+      chatId,
+      role: 'user',
+      content,
+    })
+
+    const messages = await listMessagesByChatId(chatId)
+    let assistantContent = ''
+
+    const stream = await streamAssistantReply({
+      messages,
+      onDelta(delta) {
+        assistantContent += delta
+      },
+      async onComplete() {
+        if (assistantContent.length === 0) {
+          return
+        }
+
+        await createMessage({
+          chatId,
+          role: 'assistant',
+          content: assistantContent,
+        })
+      },
+    })
 
     return new Response(stream, {
       headers: {
