@@ -7,24 +7,28 @@ import { cn } from '@/lib/utils'
 import type { Chat } from '@/types/chat'
 
 type AppShellMainProps = {
+  chatLoadError: string | null
   currentChat: Chat | null
   generatingMessageId: string | null
   inputValue: string
   isCurrentChatGenerating: boolean
   isGenerating: boolean
   locale: Locale
+  onRetryCurrentChat: () => void
   requestError: string | null
   onInputChange: (nextValue: string) => void
   onSendMessage: () => void
 }
 
 export function AppShellMain({
+  chatLoadError,
   currentChat,
   generatingMessageId,
   inputValue,
   isCurrentChatGenerating,
   isGenerating,
   locale,
+  onRetryCurrentChat,
   requestError,
   onInputChange,
   onSendMessage,
@@ -46,6 +50,19 @@ export function AppShellMain({
         </header>
 
         <section className="flex flex-1 flex-col py-8">
+          {chatLoadError ? (
+            <div className="mx-auto mb-4 w-full max-w-3xl rounded-2xl border border-destructive/25 bg-destructive/5 px-4 py-3 dark:bg-destructive/10">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="text-sm leading-6 text-foreground">
+                  {chatLoadError}
+                </div>
+                <Button onClick={onRetryCurrentChat} size="sm" type="button" variant="outline">
+                  {t(locale, 'common', 'retryAction')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           {currentChat ? (
             <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
               {currentChat.messages.length === 0 && !isCurrentChatGenerating ? (

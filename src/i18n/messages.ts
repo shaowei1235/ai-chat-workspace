@@ -19,6 +19,7 @@ export const messages: Record<Locale, MessageDictionary> = {
     common: {
       appName: 'AI Chat Workspace',
       appDescription: '循序渐进构建的 AI Chat Workspace 学习与面试项目。',
+      retryAction: '重试',
     },
     sidebar: {
       newChat: '新建对话',
@@ -26,6 +27,8 @@ export const messages: Record<Locale, MessageDictionary> = {
       emptyTitle: '还没有历史对话',
       emptyDescription: '点击上方“新建对话”开始第一条会话。',
       newChatDefaultTitle: '新对话',
+      loadErrorTitle: '对话列表加载失败',
+      loadErrorDescription: '暂时无法读取对话列表，请重试。',
       userSectionTitle: '账号',
       userName: 'Workspace User',
       userRole: 'Personal Plan',
@@ -37,6 +40,8 @@ export const messages: Record<Locale, MessageDictionary> = {
       heroSubtitle: '你可以直接输入问题，或从下方示例开始。',
       inputPlaceholder: '在这里输入你的问题…',
       activeDescription: '当前会话已接入流式 AI 回复链路。',
+      chatLoadErrorMessage: '当前对话加载失败，请重试或切换其他对话。',
+      chatMissingMessage: '当前对话不存在，已回退到可用状态。',
       messageAreaTitle: '开始发送你的第一条消息',
       inputDescription: '发送后 AI 会逐步生成回复。',
       pendingInputDescription: 'AI 正在流式生成回复，请稍候…',
@@ -63,6 +68,7 @@ export const messages: Record<Locale, MessageDictionary> = {
       appName: 'AIチャットワークスペース',
       appDescription:
         'AIチャットワークスペースを段階的に構築する学習・面接プロジェクト。',
+      retryAction: '再試行',
     },
     sidebar: {
       newChat: '新規チャット',
@@ -70,6 +76,8 @@ export const messages: Record<Locale, MessageDictionary> = {
       emptyTitle: 'まだチャット履歴がありません',
       emptyDescription: '上の「新規チャット」を押して最初の会話を始めます。',
       newChatDefaultTitle: '新しいチャット',
+      loadErrorTitle: 'チャット一覧の読み込みに失敗しました',
+      loadErrorDescription: '現在チャット一覧を取得できません。再試行してください。',
       userSectionTitle: 'アカウント',
       userName: 'Workspace User',
       userRole: 'Personal Plan',
@@ -81,6 +89,10 @@ export const messages: Record<Locale, MessageDictionary> = {
       heroSubtitle: 'そのまま質問を入力するか、下の例から始められます。',
       inputPlaceholder: 'ここに質問を入力…',
       activeDescription: '現在の会話ではストリーミング AI 返信が使えます。',
+      chatLoadErrorMessage:
+        '現在のチャットを読み込めませんでした。再試行するか別のチャットを選んでください。',
+      chatMissingMessage:
+        '現在のチャットは存在しないため、利用可能な状態に戻しました。',
       messageAreaTitle: '最初のメッセージを送信してください',
       inputDescription: '送信後に AI が返信を少しずつ生成します。',
       pendingInputDescription:

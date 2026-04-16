@@ -5,10 +5,12 @@ import { cn } from '@/lib/utils'
 import type { ChatSummary } from '@/types/chat'
 
 type AppShellSidebarProps = {
+  chatListError: string | null
   chats: ChatSummary[]
   currentChatId: string | null
   locale: Locale
   onCreateChat: () => void
+  onRetryChatList: () => void
   onSelectChat: (chatId: string) => void
 }
 
@@ -22,10 +24,12 @@ function formatChatCreatedAt(locale: Locale, createdAt: string) {
 }
 
 export function AppShellSidebar({
+  chatListError,
   chats,
   currentChatId,
   locale,
   onCreateChat,
+  onRetryChatList,
   onSelectChat,
 }: AppShellSidebarProps) {
   return (
@@ -55,7 +59,25 @@ export function AppShellSidebar({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              {chats.length === 0 ? (
+              {chatListError ? (
+                <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-4 dark:bg-destructive/10">
+                  <div className="text-sm font-medium text-foreground">
+                    {t(locale, 'sidebar', 'loadErrorTitle')}
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {chatListError}
+                  </div>
+                  <Button
+                    className="mt-3"
+                    onClick={onRetryChatList}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {t(locale, 'common', 'retryAction')}
+                  </Button>
+                </div>
+              ) : chats.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border/70 bg-background/50 px-3 py-4">
                   <div className="text-sm font-medium">
                     {t(locale, 'sidebar', 'emptyTitle')}
