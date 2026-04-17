@@ -4,6 +4,10 @@ import { useState } from 'react'
 import { t, type Locale } from '@/i18n/messages'
 import { AppShellMain } from '@/components/app-shell-main'
 import { AppShellSidebar } from '@/components/app-shell-sidebar'
+import {
+  createChatTitleFromMessage,
+  shouldAutoUpdateChatTitle,
+} from '@/features/chat/chat-title'
 import type { Chat, ChatMessage, ChatSummary } from '@/types/chat'
 
 type AppShellProps = {
@@ -364,6 +368,13 @@ export function AppShell({
     const previousChatSnapshot = currentChat
     const previousChatSummaries = chatSummaries
     const now = new Date().toISOString()
+    const nextChatTitle = shouldAutoUpdateChatTitle({
+      currentTitle: currentChat.title,
+      existingMessageCount: currentChat.messages.length,
+      firstUserMessageContent: trimmedValue,
+    })
+      ? createChatTitleFromMessage(trimmedValue)
+      : null
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -385,6 +396,11 @@ export function AppShell({
 
       return {
         ...previousChat,
+        ...(nextChatTitle
+          ? {
+              title: nextChatTitle,
+            }
+          : {}),
         updatedAt: now,
         messages: [...previousChat.messages, userMessage, assistantPlaceholder],
       }
@@ -395,6 +411,11 @@ export function AppShell({
           chat.id === targetChatId
             ? {
                 ...chat,
+                ...(nextChatTitle
+                  ? {
+                      title: nextChatTitle,
+                    }
+                  : {}),
                 updatedAt: now,
               }
             : chat,

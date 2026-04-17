@@ -4,6 +4,10 @@ import {
   getChatById,
   listMessagesByChatId,
 } from '@/features/chat/chat-data'
+import {
+  createChatTitleFromMessage,
+  shouldAutoUpdateChatTitle,
+} from '@/features/chat/chat-title'
 import { streamAssistantReply } from '@/lib/ai/openai'
 
 type ChatRouteBody = {
@@ -31,10 +35,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'CHAT_NOT_FOUND' }, { status: 404 })
     }
 
+    const nextChatTitle = shouldAutoUpdateChatTitle({
+      currentTitle: existingChat.title,
+      existingMessageCount: existingChat.messages.length,
+      firstUserMessageContent: content,
+    })
+      ? createChatTitleFromMessage(content)
+      : null
+
     await createMessage({
       chatId,
       role: 'user',
       content,
+      ...(nextChatTitle
+        ? {
+            nextChatTitle,
+          }
+        : {}),
     })
 
     const messages = await listMessagesByChatId(chatId)

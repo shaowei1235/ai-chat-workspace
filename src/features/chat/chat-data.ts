@@ -108,6 +108,7 @@ export async function createMessage(params: {
   chatId: string
   role: ChatMessageRole
   content: string
+  nextChatTitle?: string
 }): Promise<ChatMessage> {
   const role = params.role === 'user' ? MessageRole.USER : MessageRole.ASSISTANT
 
@@ -117,6 +118,11 @@ export async function createMessage(params: {
         id: params.chatId,
       },
       data: {
+        ...(params.nextChatTitle
+          ? {
+              title: params.nextChatTitle,
+            }
+          : {}),
         updatedAt: new Date(),
       },
     }),
