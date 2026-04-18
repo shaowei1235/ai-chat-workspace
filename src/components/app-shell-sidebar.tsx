@@ -1,12 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
-import { MessageSquare, Pencil, Plus, Trash2, UserCircle2 } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Globe2,
+  MessageSquare,
+  Moon,
+  Pencil,
+  Plus,
+  Settings2,
+  Sun,
+  Trash2,
+  UserCircle2,
+} from 'lucide-react'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 import type { ChatSummary } from '@/types/chat'
 
 const MAX_CHAT_TITLE_LENGTH = 50
-
 type AppShellSidebarProps = {
   chatActionError: string | null
   chatListError: string | null
@@ -41,6 +53,9 @@ export function AppShellSidebar({
   onRetryChatList,
   onSelectChat,
 }: AppShellSidebarProps) {
+  const router = useRouter()
+  const { resolvedTheme, setTheme } = useTheme()
+  const [isPending, startTransition] = useTransition()
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [draftTitle, setDraftTitle] = useState('')
   const [renameError, setRenameError] = useState<string | null>(null)
@@ -105,6 +120,31 @@ export function AppShellSidebar({
       setRenameError(t(locale, 'sidebar', 'renameChatErrorFailed'))
     }
   }
+
+  async function handleLocaleChange(nextLocale: Locale) {
+    if (nextLocale === locale) {
+      return
+    }
+
+    await fetch('/api/locale', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        locale: nextLocale,
+      }),
+    })
+    startTransition(() => {
+      router.refresh()
+    })
+  }
+
+  function handleThemeChange(nextTheme: 'light' | 'dark') {
+    setTheme(nextTheme)
+  }
+
+  const activeTheme = resolvedTheme === 'dark' ? 'dark' : 'light'
 
   return (
     <aside className="w-full border-border/60 bg-muted/15 md:h-dvh md:w-72 md:shrink-0 md:overflow-hidden md:border-r">
@@ -317,18 +357,129 @@ export function AppShellSidebar({
           <div className="pb-2 text-xs font-medium text-muted-foreground">
             {t(locale, 'sidebar', 'userSectionTitle')}
           </div>
-          <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-            <div className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <UserCircle2 className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium">
-                {t(locale, 'sidebar', 'userName')}
+          <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex size-9 items-center justify-center rounded-full bg-muted/70 text-muted-foreground">
+                <UserCircle2 className="size-5" />
               </div>
-              <div className="truncate text-xs text-muted-foreground">
-                {t(locale, 'sidebar', 'userRole')}
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">
+                  {t(locale, 'sidebar', 'userName')}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {t(locale, 'sidebar', 'userRole')}
+                </div>
               </div>
             </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  aria-label={t(locale, 'sidebar', 'settingsSectionTitle')}
+                  className="h-8 gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Settings2 className="size-4" />
+                  {t(locale, 'sidebar', 'settingsSectionTitle')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="w-64 p-2.5"
+                side="top"
+              >
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
+                      {t(locale, 'sidebar', 'languageLabel')}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-1">
+                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                        <Globe2 className="size-3.5 shrink-0" />
+                        <span className="truncate">{t(locale, 'sidebar', 'languageLabel')}</span>
+                      </div>
+                      <div className="inline-flex items-center rounded-md border border-border/60 bg-muted/35 p-0.5 dark:bg-muted/20">
+                        {(['zh-CN', 'ja'] as const).map((nextLocale) => {
+                          const isActive = nextLocale === locale
+
+                          return (
+                            <Button
+                              className={cn(
+                                'h-6 min-w-[3.1rem] rounded-[5px] px-2 text-[11px] font-medium shadow-none',
+                                'border-transparent bg-transparent text-muted-foreground hover:bg-background/80 hover:text-foreground dark:hover:bg-background/60',
+                                isActive &&
+                                  'border-border/70 bg-background text-foreground hover:bg-background dark:border-border/60 dark:bg-background/80',
+                              )}
+                              disabled={isPending}
+                              key={nextLocale}
+                              onClick={() => {
+                                void handleLocaleChange(nextLocale)
+                              }}
+                              size="xs"
+                              type="button"
+                              variant="ghost"
+                            >
+                              {nextLocale === 'zh-CN'
+                                ? t(locale, 'sidebar', 'localeZhCn')
+                                : t(locale, 'sidebar', 'localeJa')}
+                            </Button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
+                      {t(locale, 'sidebar', 'themeLabel')}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-1">
+                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                        {activeTheme === 'dark' ? (
+                          <Moon className="size-3.5 shrink-0" />
+                        ) : (
+                          <Sun className="size-3.5 shrink-0" />
+                        )}
+                        <span className="truncate">{t(locale, 'sidebar', 'themeLabel')}</span>
+                      </div>
+                      <div className="inline-flex items-center rounded-md border border-border/60 bg-muted/35 p-0.5 dark:bg-muted/20">
+                        {(['light', 'dark'] as const).map((nextTheme) => {
+                          const isActive = activeTheme === nextTheme
+
+                          return (
+                            <Button
+                              className={cn(
+                                'h-6 min-w-[3.1rem] rounded-[5px] px-2 text-[11px] font-medium shadow-none',
+                                'border-transparent bg-transparent text-muted-foreground hover:bg-background/80 hover:text-foreground dark:hover:bg-background/60',
+                                isActive &&
+                                  'border-border/70 bg-background text-foreground hover:bg-background dark:border-border/60 dark:bg-background/80',
+                              )}
+                              key={nextTheme}
+                              onClick={() => handleThemeChange(nextTheme)}
+                              size="xs"
+                              type="button"
+                              variant="ghost"
+                            >
+                              {nextTheme === 'light' ? (
+                                <>
+                                  <Sun className="size-3" />
+                                  {t(locale, 'sidebar', 'themeLight')}
+                                </>
+                              ) : (
+                                <>
+                                  <Moon className="size-3" />
+                                  {t(locale, 'sidebar', 'themeDark')}
+                                </>
+                              )}
+                            </Button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </footer>
       </div>
