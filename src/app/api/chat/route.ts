@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers'
+import { getServerSession } from 'next-auth'
 import { NextResponse } from 'next/server'
+import { authOptions } from '@/auth'
 import {
   createMessage,
   getChatById,
@@ -26,6 +28,8 @@ type ChatRouteBody = {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const isAuthenticated = Boolean(session?.user)
     const cookieStore = await cookies()
     const { guestId, shouldSetCookie } = resolveGuestId(
       cookieStore.get(GUEST_ID_COOKIE_NAME)?.value,
@@ -56,7 +60,9 @@ export async function POST(request: Request) {
       ? createChatTitleFromMessage(content)
       : null
 
-    const guestUsage = await consumeGuestUsage(guestId)
+    const guestUsage = isAuthenticated
+      ? null
+      : await consumeGuestUsage(guestId)
 
     try {
       await createMessage({
@@ -70,7 +76,9 @@ export async function POST(request: Request) {
           : {}),
       })
     } catch (error) {
-      await restoreGuestUsage(guestId)
+      if (!isAuthenticated) {
+        await restoreGuestUsage(guestId)
+      }
       throw error
     }
 
@@ -100,13 +108,17 @@ export async function POST(request: Request) {
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
         'Content-Type': 'text/event-stream; charset=utf-8',
-        'X-Guest-Limit': String(guestUsage.limit),
-        'X-Guest-Remaining': String(guestUsage.remainingCount),
-        'X-Guest-Used': String(guestUsage.usedCount),
+        ...(guestUsage
+          ? {
+              'X-Guest-Limit': String(guestUsage.limit),
+              'X-Guest-Remaining': String(guestUsage.remainingCount),
+              'X-Guest-Used': String(guestUsage.usedCount),
+            }
+          : {}),
       },
     })
 
-    if (shouldSetCookie) {
+    if (!isAuthenticated && shouldSetCookie) {
       response.headers.set('Set-Cookie', createGuestCookieValue(guestId))
     }
 

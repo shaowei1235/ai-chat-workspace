@@ -1,11 +1,22 @@
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/auth'
 import { AppShell } from '@/components/app-shell'
 import { getChatById, listChatSummaries } from '@/features/chat/chat-data'
 import { getLocale } from '@/i18n/get-locale'
 import { t } from '@/i18n/messages'
+import type { AuthUser } from '@/types/auth'
 import type { Chat, ChatSummary } from '@/types/chat'
 
 export default async function Home() {
+  const session = await getServerSession(authOptions)
   const locale = await getLocale()
+  const authUser: AuthUser | null = session?.user
+    ? {
+        email: session.user.email ?? null,
+        image: session.user.image ?? null,
+        name: session.user.name ?? null,
+      }
+    : null
   let chats: ChatSummary[] = []
   let initialCurrentChat: Chat | null = null
   let initialChatListError: string | null = null
@@ -29,6 +40,7 @@ export default async function Home() {
 
   return (
     <AppShell
+      authUser={authUser}
       initialChatListError={initialChatListError}
       initialChatLoadError={initialChatLoadError}
       initialChatSummaries={chats}

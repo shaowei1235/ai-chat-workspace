@@ -34,6 +34,7 @@ export function ChatExampleGuide({
           <div
             key={example}
             className="rounded-full border border-border/60 bg-muted/20 px-4 py-2 text-sm text-foreground"
+            suppressHydrationWarning
           >
             {example}
           </div>

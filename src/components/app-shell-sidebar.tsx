@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useTheme } from 'next-themes'
+import { signIn, signOut } from 'next-auth/react'
+import { useTheme } from '@/components/theme-provider'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Globe2,
+  Github,
   MessageSquare,
   Moon,
   Pencil,
@@ -16,10 +19,12 @@ import {
 } from 'lucide-react'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
+import type { AuthUser } from '@/types/auth'
 import type { ChatSummary } from '@/types/chat'
 
 const MAX_CHAT_TITLE_LENGTH = 50
 type AppShellSidebarProps = {
+  authUser: AuthUser | null
   chatActionError: string | null
   chatListError: string | null
   chats: ChatSummary[]
@@ -42,6 +47,7 @@ function formatChatCreatedAt(locale: Locale, createdAt: string) {
 }
 
 export function AppShellSidebar({
+  authUser,
   chatActionError,
   chatListError,
   chats,
@@ -145,6 +151,7 @@ export function AppShellSidebar({
   }
 
   const activeTheme = resolvedTheme === 'dark' ? 'dark' : 'light'
+  const isAuthenticated = authUser !== null
 
   return (
     <aside className="w-full border-border/60 bg-muted/15 md:h-dvh md:w-72 md:shrink-0 md:overflow-hidden md:border-r">
@@ -359,15 +366,27 @@ export function AppShellSidebar({
           </div>
           <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-full bg-muted/70 text-muted-foreground">
-                <UserCircle2 className="size-5" />
-              </div>
+              {authUser?.image ? (
+                <Image
+                  alt={authUser.name ?? t(locale, 'auth', 'guestName')}
+                  className="size-9 rounded-full object-cover"
+                  height={36}
+                  src={authUser.image}
+                  width={36}
+                />
+              ) : (
+                <div className="flex size-9 items-center justify-center rounded-full bg-muted/70 text-muted-foreground">
+                  <UserCircle2 className="size-5" />
+                </div>
+              )}
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">
-                  {t(locale, 'sidebar', 'userName')}
+                  {authUser?.name ?? t(locale, 'auth', 'guestName')}
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {t(locale, 'sidebar', 'userRole')}
+                  {isAuthenticated
+                    ? t(locale, 'auth', 'githubLoggedIn')
+                    : t(locale, 'auth', 'guestRole')}
                 </div>
               </div>
             </div>
@@ -480,6 +499,34 @@ export function AppShellSidebar({
                 </div>
               </PopoverContent>
             </Popover>
+          </div>
+          <div className="mt-2 px-2">
+            {isAuthenticated ? (
+              <Button
+                className="w-full justify-center"
+                onClick={() => {
+                  void signOut({ callbackUrl: '/' })
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {t(locale, 'auth', 'signOut')}
+              </Button>
+            ) : (
+              <Button
+                className="w-full justify-center"
+                onClick={() => {
+                  void signIn('github', { callbackUrl: '/' })
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <Github className="size-4" />
+                {t(locale, 'auth', 'signInWithGitHub')}
+              </Button>
+            )}
           </div>
         </footer>
       </div>

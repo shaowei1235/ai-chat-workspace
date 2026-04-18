@@ -1,13 +1,16 @@
 import { useEffect, useRef } from 'react'
+import { signIn } from 'next-auth/react'
 import { ChatExampleGuide } from '@/components/chat-example-guide'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp, Github } from 'lucide-react'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
+import type { AuthUser } from '@/types/auth'
 import type { Chat } from '@/types/chat'
 
 type AppShellMainProps = {
+  authUser: AuthUser | null
   chatLoadError: string | null
   currentChat: Chat | null
   generatingMessageId: string | null
@@ -26,6 +29,7 @@ type AppShellMainProps = {
 }
 
 export function AppShellMain({
+  authUser,
   chatLoadError,
   currentChat,
   generatingMessageId,
@@ -48,6 +52,7 @@ export function AppShellMain({
   const hasCurrentChat = currentChat !== null
   const lastMessageContent =
     currentChat?.messages[currentChat.messages.length - 1]?.content ?? ''
+  const isAuthenticated = authUser !== null
 
   function scrollMessagesToBottom() {
     messageListEndRef.current?.scrollIntoView({
@@ -243,7 +248,9 @@ export function AppShellMain({
               <div className="mt-3 flex items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">
-                    {isGuestUsageLoading
+                    {isAuthenticated
+                      ? t(locale, 'emptyState', 'guestUsageLoggedIn')
+                      : isGuestUsageLoading
                       ? t(locale, 'emptyState', 'guestUsageLoading')
                       : isGuestLimitReached
                         ? t(locale, 'emptyState', 'guestUsageReached')
@@ -253,6 +260,20 @@ export function AppShellMain({
                     <div className="text-xs text-destructive">
                       {requestError}
                     </div>
+                  ) : null}
+                  {!isAuthenticated && isGuestLimitReached ? (
+                    <Button
+                      className="mt-1 h-7 rounded-full px-3 text-xs"
+                      onClick={() => {
+                        void signIn('github', { callbackUrl: '/' })
+                      }}
+                      size="xs"
+                      type="button"
+                      variant="outline"
+                    >
+                      <Github className="size-3.5" />
+                      {t(locale, 'emptyState', 'continueWithGitHub')}
+                    </Button>
                   ) : null}
                 </div>
                 <Button

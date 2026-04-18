@@ -8,9 +8,11 @@ import {
   createChatTitleFromMessage,
   shouldAutoUpdateChatTitle,
 } from '@/features/chat/chat-title'
+import type { AuthUser } from '@/types/auth'
 import type { Chat, ChatMessage, ChatSummary } from '@/types/chat'
 
 type AppShellProps = {
+  authUser: AuthUser | null
   initialChatListError: string | null
   initialChatLoadError: string | null
   initialChatSummaries: ChatSummary[]
@@ -68,6 +70,7 @@ function sortChatSummaries(chats: ChatSummary[]) {
 }
 
 export function AppShell({
+  authUser,
   initialChatListError,
   initialChatLoadError,
   initialChatSummaries,
@@ -104,7 +107,9 @@ export function AppShell({
   const isGenerating = generatingChatId !== null
   const isCurrentChatGenerating =
     currentChat !== null && currentChat.id === generatingChatId
-  const isGuestLimitReached = guestUsage.remainingCount <= 0
+  const isAuthenticated = authUser !== null
+  const isGuestLimitReached =
+    !isAuthenticated && guestUsage.remainingCount <= 0
 
   // 统一处理前端 fetch 返回：成功时解析 JSON，失败时转换成带状态码的错误对象。
   async function readJson<T>(response: Response): Promise<T> {
@@ -194,10 +199,15 @@ export function AppShell({
   }
 
   useEffect(() => {
+    if (isAuthenticated) {
+      setIsGuestUsageLoading(false)
+      return
+    }
+
     void refreshGuestUsage().catch(() => {
       setIsGuestUsageLoading(false)
     })
-  }, [refreshGuestUsage])
+  }, [isAuthenticated, refreshGuestUsage])
 
   // 当 sidebar 列表读取失败时，给“重试”按钮使用的最小恢复动作。
   async function handleRetryChatList() {
@@ -682,6 +692,7 @@ export function AppShell({
   return (
     <div className="flex min-h-dvh flex-col bg-background md:h-dvh md:flex-row md:overflow-hidden">
       <AppShellSidebar
+        authUser={authUser}
         chatActionError={chatActionError}
         chatListError={chatListError}
         chats={chatSummaries}
@@ -694,6 +705,7 @@ export function AppShell({
         onSelectChat={handleSelectChat}
       />
       <AppShellMain
+        authUser={authUser}
         chatLoadError={chatLoadError}
         currentChat={currentChat}
         generatingMessageId={generatingMessageId}

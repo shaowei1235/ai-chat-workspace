@@ -63,6 +63,8 @@ export const messages: Record<Locale, MessageDictionary> = {
       guestUsageRemainingSuffix: '次',
       guestUsageReached: 'Guest 试用额度已用尽',
       guestUsageReachedDescription: '当前已达到 Guest 上限，暂时无法继续发送。',
+      guestUsageLoggedIn: '已登录，当前不受 Guest 试用限额影响。',
+      continueWithGitHub: 'GitHub 登录继续使用',
       sendButtonLabel: '发送消息',
       emptyChatTitle: '这个会话还没有消息',
       emptyChatDescription:
@@ -78,7 +80,13 @@ export const messages: Record<Locale, MessageDictionary> = {
       example5: '解释一个前端概念给初学者',
       example6: '把想法整理成结构化大纲',
     },
-    auth: {},
+    auth: {
+      guestName: 'Guest',
+      guestRole: '试用模式',
+      githubLoggedIn: 'GitHub 已登录',
+      signInWithGitHub: 'GitHub 登录',
+      signOut: '退出登录',
+    },
   },
   ja: {
     common: {
@@ -137,6 +145,9 @@ export const messages: Record<Locale, MessageDictionary> = {
       guestUsageReached: 'Guest の試用回数を使い切りました',
       guestUsageReachedDescription:
         'Guest 上限に達したため、これ以上送信できません。',
+      guestUsageLoggedIn:
+        'ログイン済みのため、Guest 試用回数の制限を受けません。',
+      continueWithGitHub: 'GitHub にログインして続行',
       sendButtonLabel: 'メッセージを送信',
       emptyChatTitle: 'この会話にはまだメッセージがありません',
       emptyChatDescription:
@@ -152,7 +163,13 @@ export const messages: Record<Locale, MessageDictionary> = {
       example5: 'フロントエンドの概念を初心者向けに説明する',
       example6: 'アイデアを構造化されたアウトラインにまとめる',
     },
-    auth: {},
+    auth: {
+      guestName: 'Guest',
+      guestRole: '試用モード',
+      githubLoggedIn: 'GitHub でログイン済み',
+      signInWithGitHub: 'GitHub でログイン',
+      signOut: 'ログアウト',
+    },
   },
 }
 
