@@ -24,6 +24,8 @@ export const messages: Record<Locale, MessageDictionary> = {
     sidebar: {
       newChat: '新建对话',
       chatSectionTitle: '对话',
+      deleteChatLabel: '删除对话',
+      deleteChatError: '删除对话失败，请稍后再试。',
       emptyTitle: '还没有历史对话',
       emptyDescription: '点击上方“新建对话”开始第一条会话。',
       newChatDefaultTitle: '新对话',
@@ -73,6 +75,8 @@ export const messages: Record<Locale, MessageDictionary> = {
     sidebar: {
       newChat: '新規チャット',
       chatSectionTitle: 'チャット',
+      deleteChatLabel: 'チャットを削除',
+      deleteChatError: 'チャットの削除に失敗しました。しばらくしてから再度お試しください。',
       emptyTitle: 'まだチャット履歴がありません',
       emptyDescription: '上の「新規チャット」を押して最初の会話を始めます。',
       newChatDefaultTitle: '新しいチャット',

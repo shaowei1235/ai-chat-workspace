@@ -1,15 +1,17 @@
 import { Button } from '@/components/ui/button'
-import { MessageSquare, Plus, UserCircle2 } from 'lucide-react'
+import { MessageSquare, Plus, Trash2, UserCircle2 } from 'lucide-react'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 import type { ChatSummary } from '@/types/chat'
 
 type AppShellSidebarProps = {
+  chatActionError: string | null
   chatListError: string | null
   chats: ChatSummary[]
   currentChatId: string | null
   locale: Locale
   onCreateChat: () => void
+  onDeleteChat: (chatId: string) => void
   onRetryChatList: () => void
   onSelectChat: (chatId: string) => void
 }
@@ -24,11 +26,13 @@ function formatChatCreatedAt(locale: Locale, createdAt: string) {
 }
 
 export function AppShellSidebar({
+  chatActionError,
   chatListError,
   chats,
   currentChatId,
   locale,
   onCreateChat,
+  onDeleteChat,
   onRetryChatList,
   onSelectChat,
 }: AppShellSidebarProps) {
@@ -57,6 +61,12 @@ export function AppShellSidebar({
                 {t(locale, 'sidebar', 'chatSectionTitle')}
               </div>
             </div>
+
+            {chatActionError ? (
+              <div className="mb-3 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs leading-5 text-destructive dark:bg-destructive/10">
+                {chatActionError}
+              </div>
+            ) : null}
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {chatListError ? (
@@ -95,7 +105,7 @@ export function AppShellSidebar({
                       <button
                         key={chat.id}
                         className={cn(
-                          'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors outline-none',
+                          'group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors outline-none',
                           'hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30',
                           isActive
                             ? 'bg-primary/10 text-foreground dark:bg-primary/15'
@@ -118,6 +128,29 @@ export function AppShellSidebar({
                             {formatChatCreatedAt(locale, chat.updatedAt)}
                           </div>
                         </div>
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-y-0 right-0 w-14 rounded-r-xl bg-gradient-to-l from-background/90 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+                        />
+                        <span
+                          className={cn(
+                            'relative z-10 flex shrink-0 items-center',
+                            'opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100',
+                          )}
+                        >
+                          <button
+                            aria-label={t(locale, 'sidebar', 'deleteChatLabel')}
+                            className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:bg-destructive/15"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              onDeleteChat(chat.id)
+                            }}
+                            type="button"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </span>
                       </button>
                     )
                   })}

@@ -75,6 +75,7 @@ export function AppShell({
   const [chatLoadError, setChatLoadError] = useState<string | null>(
     initialChatLoadError,
   )
+  const [chatActionError, setChatActionError] = useState<string | null>(null)
   const [requestError, setRequestError] = useState<string | null>(null)
 
   const isGenerating = generatingChatId !== null
@@ -135,6 +136,7 @@ export function AppShell({
   // 当 sidebar 列表读取失败时，给“重试”按钮使用的最小恢复动作。
   async function handleRetryChatList() {
     try {
+      setChatActionError(null)
       await refreshChatList()
     } catch (error) {
       console.error('重试加载对话列表失败', error)
@@ -232,6 +234,7 @@ export function AppShell({
       )
       setChatListError(null)
       setChatLoadError(null)
+      setChatActionError(null)
       setRequestError(null)
     } catch (error) {
       console.error('创建数据库对话失败', error)
@@ -239,9 +242,49 @@ export function AppShell({
     }
   }
 
+  async function handleDeleteChat(chatId: string) {
+    const deletedChatIndex = chatSummaries.findIndex((chat) => chat.id === chatId)
+    const remainingChats = chatSummaries.filter((chat) => chat.id !== chatId)
+    const nextFallbackChatId =
+      remainingChats[deletedChatIndex]?.id ??
+      remainingChats[deletedChatIndex - 1]?.id ??
+      remainingChats[0]?.id ??
+      null
+
+    try {
+      const response = await fetch(`/api/chats/${chatId}`, {
+        method: 'DELETE',
+      })
+
+      await readJson<{ success: true }>(response)
+
+      setChatSummaries(remainingChats)
+      setChatActionError(null)
+      setRequestError(null)
+
+      if (chatId !== currentChatId) {
+        return
+      }
+
+      if (!nextFallbackChatId) {
+        setCurrentChatId(null)
+        setCurrentChat(null)
+        setChatLoadError(null)
+        return
+      }
+
+      setChatLoadError(null)
+      await loadChat(nextFallbackChatId)
+    } catch (error) {
+      console.error('删除数据库对话失败', error)
+      setChatActionError(t(locale, 'sidebar', 'deleteChatError'))
+    }
+  }
+
   // 切换当前会话：读取目标 chat 的数据库内容，并处理它不存在或加载失败的情况。
   async function handleSelectChat(chatId: string) {
     try {
+      setChatActionError(null)
       setRequestError(null)
       setChatLoadError(null)
       await loadChat(chatId)
@@ -424,6 +467,7 @@ export function AppShell({
     )
 
     setRequestError(null)
+    setChatActionError(null)
     setChatLoadError(null)
     setGeneratingChatId(targetChatId)
     setGeneratingMessageId(assistantMessageId)
@@ -469,11 +513,13 @@ export function AppShell({
   return (
     <div className="flex min-h-dvh flex-col bg-background md:flex-row">
       <AppShellSidebar
+        chatActionError={chatActionError}
         chatListError={chatListError}
         chats={chatSummaries}
         currentChatId={currentChatId}
         locale={locale}
         onCreateChat={handleCreateChat}
+        onDeleteChat={handleDeleteChat}
         onRetryChatList={handleRetryChatList}
         onSelectChat={handleSelectChat}
       />
