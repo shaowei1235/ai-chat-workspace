@@ -10,7 +10,7 @@ export function isLocale(value: unknown): value is Locale {
   )
 }
 
-type MessageNamespace = 'common' | 'sidebar' | 'emptyState' | 'auth'
+type MessageNamespace = 'common' | 'sidebar' | 'emptyState' | 'auth' | 'presets'
 
 type MessageDictionary = Record<MessageNamespace, Record<string, string>>
 
@@ -86,6 +86,23 @@ export const messages: Record<Locale, MessageDictionary> = {
       githubLoggedIn: 'GitHub 已登录',
       signInWithGitHub: 'GitHub 登录',
       signOut: '退出登录',
+    },
+    presets: {
+      groupWriting: '写作',
+      groupWork: '工作',
+      groupLearning: '学习',
+      summarizeLabel: '总结一段文本',
+      summarizePrompt: '请帮我总结下面这段内容，并提炼出 3 个最重要的观点：',
+      rewriteLabel: '改写成更专业的语气',
+      rewritePrompt: '请将下面这段内容改写成更专业、清晰且自然的表达：',
+      todoLabel: '生成待办清单',
+      todoPrompt: '请根据下面的信息整理一份清晰的待办清单，并按优先级排序：',
+      meetingLabel: '提炼会议行动项',
+      meetingPrompt: '请从下面这段会议记录中提炼行动项，并标明负责人和截止时间：',
+      explainLabel: '解释一个前端概念',
+      explainPrompt: '请用初学者能理解的语言解释这个前端概念，并举一个简单例子：',
+      outlineLabel: '整理结构化大纲',
+      outlinePrompt: '请把下面的想法整理成一个结构清晰、层级明确的大纲：',
     },
   },
   ja: {
@@ -169,6 +186,23 @@ export const messages: Record<Locale, MessageDictionary> = {
       githubLoggedIn: 'GitHub でログイン済み',
       signInWithGitHub: 'GitHub でログイン',
       signOut: 'ログアウト',
+    },
+    presets: {
+      groupWriting: '作成',
+      groupWork: '仕事',
+      groupLearning: '学習',
+      summarizeLabel: '文章を要約する',
+      summarizePrompt: '次の内容を要約し、特に重要なポイントを 3 つに整理してください：',
+      rewriteLabel: 'より丁寧な表現に書き換える',
+      rewritePrompt: '次の内容を、より丁寧でプロフェッショナルな表現に書き換えてください：',
+      todoLabel: 'ToDoリストを作成する',
+      todoPrompt: '次の内容をもとに、優先順位つきの ToDo リストに整理してください：',
+      meetingLabel: '会議のアクション項目を整理する',
+      meetingPrompt: '次の会議メモからアクション項目を抽出し、担当者と期限を整理してください：',
+      explainLabel: 'フロントエンド概念を説明する',
+      explainPrompt: 'このフロントエンドの概念を初心者向けにやさしく説明し、簡単な例も添えてください：',
+      outlineLabel: '構造化されたアウトラインにする',
+      outlinePrompt: '次のアイデアを、構造が分かりやすいアウトラインに整理してください：',
     },
   },
 }

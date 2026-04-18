@@ -49,6 +49,7 @@ export function AppShellMain({
   const isComposingRef = useRef(false)
   const messageScrollViewportRef = useRef<HTMLDivElement | null>(null)
   const messageListEndRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const hasCurrentChat = currentChat !== null
   const lastMessageContent =
     currentChat?.messages[currentChat.messages.length - 1]?.content ?? ''
@@ -57,6 +58,20 @@ export function AppShellMain({
   function scrollMessagesToBottom() {
     messageListEndRef.current?.scrollIntoView({
       block: 'end',
+    })
+  }
+
+  function handleSelectQuickPrompt(prompt: string) {
+    // 当前阶段采用“显式点击就直接覆盖”的策略，行为最简单也最可预期。
+    onInputChange(prompt)
+
+    window.requestAnimationFrame(() => {
+      if (!inputRef.current || inputRef.current.disabled) {
+        return
+      }
+
+      inputRef.current.focus()
+      inputRef.current.setSelectionRange(prompt.length, prompt.length)
     })
   }
 
@@ -125,6 +140,7 @@ export function AppShellMain({
                       'emptyChatDescription',
                     )}
                     locale={locale}
+                    onSelectPrompt={handleSelectQuickPrompt}
                   />
                 </div>
               ) : (
@@ -205,6 +221,7 @@ export function AppShellMain({
               <ChatExampleGuide
                 description={t(locale, 'emptyState', 'heroSubtitle')}
                 locale={locale}
+                onSelectPrompt={handleSelectQuickPrompt}
               />
             </div>
           )}
@@ -238,6 +255,7 @@ export function AppShellMain({
                     onSendMessage()
                   }
                 }}
+                ref={inputRef}
                 placeholder={
                   currentChat
                     ? t(locale, 'emptyState', 'inputPlaceholder')
