@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { t, type Locale } from '@/i18n/messages'
 import { AppShellMain } from '@/components/app-shell-main'
 import { AppShellSidebar } from '@/components/app-shell-sidebar'
@@ -32,16 +32,29 @@ type RenameChatResponse = {
 
 type ErrorResponse = {
   error?: string
+  guestUsage?: GuestUsageInfo
+}
+
+type GuestUsageInfo = {
+  limit: number
+  remainingCount: number
+  usedCount: number
+}
+
+type GuestUsageResponse = {
+  guestUsage: GuestUsageInfo
 }
 
 const LOCAL_REQUEST_ERROR_LOG = '获取 AI 流式回复失败'
 const LOCAL_STREAM_PARSE_ERROR = '流式响应解析失败'
+const DEFAULT_GUEST_LIMIT = 10
 
 class AppShellRequestError extends Error {
   constructor(
     message: string,
     readonly status: number,
     readonly code: string | null = null,
+    readonly guestUsage: GuestUsageInfo | null = null,
   ) {
     super(message)
   }
@@ -81,19 +94,34 @@ export function AppShell({
   )
   const [chatActionError, setChatActionError] = useState<string | null>(null)
   const [requestError, setRequestError] = useState<string | null>(null)
+  const [guestUsage, setGuestUsage] = useState<GuestUsageInfo>({
+    limit: DEFAULT_GUEST_LIMIT,
+    remainingCount: DEFAULT_GUEST_LIMIT,
+    usedCount: 0,
+  })
+  const [isGuestUsageLoading, setIsGuestUsageLoading] = useState(true)
 
   const isGenerating = generatingChatId !== null
   const isCurrentChatGenerating =
     currentChat !== null && currentChat.id === generatingChatId
+  const isGuestLimitReached = guestUsage.remainingCount <= 0
 
   // 统一处理前端 fetch 返回：成功时解析 JSON，失败时转换成带状态码的错误对象。
   async function readJson<T>(response: Response): Promise<T> {
     if (!response.ok) {
       let errorCode: string | null = null
+      let guestUsage: GuestUsageInfo | null = null
 
       try {
         const body = (await response.json()) as ErrorResponse
         errorCode = typeof body.error === 'string' ? body.error : null
+        guestUsage =
+          body.guestUsage &&
+          typeof body.guestUsage.limit === 'number' &&
+          typeof body.guestUsage.remainingCount === 'number' &&
+          typeof body.guestUsage.usedCount === 'number'
+            ? body.guestUsage
+            : null
       } catch {
         errorCode = null
       }
@@ -102,6 +130,7 @@ export function AppShell({
         `请求失败: ${response.status}`,
         response.status,
         errorCode,
+        guestUsage,
       )
     }
 
@@ -122,6 +151,33 @@ export function AppShell({
     return data.chats
   }
 
+  const refreshGuestUsage = useCallback(async () => {
+    const response = await fetch('/api/guest/usage', {
+      method: 'GET',
+      cache: 'no-store',
+    })
+
+    if (!response.ok) {
+      const fallbackGuestUsage = {
+        limit: DEFAULT_GUEST_LIMIT,
+        remainingCount: DEFAULT_GUEST_LIMIT,
+        usedCount: 0,
+      }
+
+      setGuestUsage(fallbackGuestUsage)
+      setIsGuestUsageLoading(false)
+
+      return fallbackGuestUsage
+    }
+
+    const data = await readJson<GuestUsageResponse>(response)
+
+    setGuestUsage(data.guestUsage)
+    setIsGuestUsageLoading(false)
+
+    return data.guestUsage
+  }, [])
+
   // 读取某个 chat 的完整内容，用于主区域显示消息列表。
   async function loadChat(chatId: string) {
     const response = await fetch(`/api/chats/${chatId}`, {
@@ -136,6 +192,12 @@ export function AppShell({
 
     return data.chat
   }
+
+  useEffect(() => {
+    void refreshGuestUsage().catch(() => {
+      setIsGuestUsageLoading(false)
+    })
+  }, [refreshGuestUsage])
 
   // 当 sidebar 列表读取失败时，给“重试”按钮使用的最小恢复动作。
   async function handleRetryChatList() {
@@ -398,7 +460,49 @@ export function AppShell({
     })
 
     if (!response.ok || !response.body) {
+      if (!response.ok) {
+        let errorCode: string | null = null
+        let nextGuestUsage: GuestUsageInfo | null = null
+
+        try {
+          const body = (await response.json()) as ErrorResponse
+          errorCode = typeof body.error === 'string' ? body.error : null
+          nextGuestUsage =
+            body.guestUsage &&
+            typeof body.guestUsage.limit === 'number' &&
+            typeof body.guestUsage.remainingCount === 'number' &&
+            typeof body.guestUsage.usedCount === 'number'
+              ? body.guestUsage
+              : null
+        } catch {
+          errorCode = null
+        }
+
+        throw new AppShellRequestError(
+          `聊天请求失败: ${response.status}`,
+          response.status,
+          errorCode,
+          nextGuestUsage,
+        )
+      }
+
       throw new Error(`聊天请求失败: ${response.status}`)
+    }
+
+    const nextGuestLimit = Number(response.headers.get('X-Guest-Limit'))
+    const nextGuestRemaining = Number(response.headers.get('X-Guest-Remaining'))
+    const nextGuestUsed = Number(response.headers.get('X-Guest-Used'))
+
+    if (
+      Number.isFinite(nextGuestLimit) &&
+      Number.isFinite(nextGuestRemaining) &&
+      Number.isFinite(nextGuestUsed)
+    ) {
+      setGuestUsage({
+        limit: nextGuestLimit,
+        remainingCount: nextGuestRemaining,
+        usedCount: nextGuestUsed,
+      })
     }
 
     const reader = response.body.getReader()
@@ -452,7 +556,13 @@ export function AppShell({
   async function handleSendMessage() {
     const trimmedValue = inputValue.trim()
 
-    if (!currentChatId || !currentChat || trimmedValue.length === 0 || isGenerating) {
+    if (
+      !currentChatId ||
+      !currentChat ||
+      trimmedValue.length === 0 ||
+      isGenerating ||
+      isGuestLimitReached
+    ) {
       return
     }
 
@@ -527,7 +637,17 @@ export function AppShell({
       await Promise.all([refreshChatList(), loadChat(targetChatId)])
     } catch (error) {
       console.error(LOCAL_REQUEST_ERROR_LOG, error)
-      setRequestError(t(locale, 'emptyState', 'requestErrorMessage'))
+      if (
+        error instanceof AppShellRequestError &&
+        error.code === 'GUEST_LIMIT_REACHED'
+      ) {
+        if (error.guestUsage) {
+          setGuestUsage(error.guestUsage)
+        }
+        setRequestError(t(locale, 'emptyState', 'guestUsageReachedDescription'))
+      } else {
+        setRequestError(t(locale, 'emptyState', 'requestErrorMessage'))
+      }
 
       try {
         await Promise.all([refreshChatList(), loadChat(targetChatId)])
@@ -577,7 +697,11 @@ export function AppShell({
         chatLoadError={chatLoadError}
         currentChat={currentChat}
         generatingMessageId={generatingMessageId}
+        guestLimit={guestUsage.limit}
+        guestRemainingCount={guestUsage.remainingCount}
         inputValue={inputValue}
+        isGuestLimitReached={isGuestLimitReached}
+        isGuestUsageLoading={isGuestUsageLoading}
         isCurrentChatGenerating={isCurrentChatGenerating}
         isGenerating={isGenerating}
         locale={locale}

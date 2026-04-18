@@ -1,9 +1,18 @@
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import {
   createMessage,
   getChatById,
   listMessagesByChatId,
 } from '@/features/chat/chat-data'
+import {
+  GUEST_ID_COOKIE_NAME,
+  GuestLimitReachedError,
+  consumeGuestUsage,
+  createGuestCookieValue,
+  resolveGuestId,
+  restoreGuestUsage,
+} from '@/features/guest/guest-data'
 import {
   createChatTitleFromMessage,
   shouldAutoUpdateChatTitle,
@@ -17,6 +26,10 @@ type ChatRouteBody = {
 
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies()
+    const { guestId, shouldSetCookie } = resolveGuestId(
+      cookieStore.get(GUEST_ID_COOKIE_NAME)?.value,
+    )
     const body = (await request.json()) as ChatRouteBody
     const chatId = body.chatId
     const content = body.content?.trim()
@@ -43,16 +56,23 @@ export async function POST(request: Request) {
       ? createChatTitleFromMessage(content)
       : null
 
-    await createMessage({
-      chatId,
-      role: 'user',
-      content,
-      ...(nextChatTitle
-        ? {
-            nextChatTitle,
-          }
-        : {}),
-    })
+    const guestUsage = await consumeGuestUsage(guestId)
+
+    try {
+      await createMessage({
+        chatId,
+        role: 'user',
+        content,
+        ...(nextChatTitle
+          ? {
+              nextChatTitle,
+            }
+          : {}),
+      })
+    } catch (error) {
+      await restoreGuestUsage(guestId)
+      throw error
+    }
 
     const messages = await listMessagesByChatId(chatId)
     let assistantContent = ''
@@ -75,14 +95,33 @@ export async function POST(request: Request) {
       },
     })
 
-    return new Response(stream, {
+    const response = new Response(stream, {
       headers: {
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
         'Content-Type': 'text/event-stream; charset=utf-8',
+        'X-Guest-Limit': String(guestUsage.limit),
+        'X-Guest-Remaining': String(guestUsage.remainingCount),
+        'X-Guest-Used': String(guestUsage.usedCount),
       },
     })
+
+    if (shouldSetCookie) {
+      response.headers.set('Set-Cookie', createGuestCookieValue(guestId))
+    }
+
+    return response
   } catch (error) {
+    if (error instanceof GuestLimitReachedError) {
+      return NextResponse.json(
+        {
+          error: 'GUEST_LIMIT_REACHED',
+          guestUsage: error.guestUsage,
+        },
+        { status: 429 },
+      )
+    }
+
     console.error('聊天接口流式请求失败', error)
 
     return NextResponse.json(

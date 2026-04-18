@@ -11,7 +11,11 @@ type AppShellMainProps = {
   chatLoadError: string | null
   currentChat: Chat | null
   generatingMessageId: string | null
+  guestLimit: number
+  guestRemainingCount: number
   inputValue: string
+  isGuestLimitReached: boolean
+  isGuestUsageLoading: boolean
   isCurrentChatGenerating: boolean
   isGenerating: boolean
   locale: Locale
@@ -25,7 +29,11 @@ export function AppShellMain({
   chatLoadError,
   currentChat,
   generatingMessageId,
+  guestLimit,
+  guestRemainingCount,
   inputValue,
+  isGuestLimitReached,
+  isGuestUsageLoading,
   isCurrentChatGenerating,
   isGenerating,
   locale,
@@ -89,7 +97,12 @@ export function AppShellMain({
                 <div className="text-sm leading-6 text-foreground">
                   {chatLoadError}
                 </div>
-                <Button onClick={onRetryCurrentChat} size="sm" type="button" variant="outline">
+                <Button
+                  onClick={onRetryCurrentChat}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
                   {t(locale, 'common', 'retryAction')}
                 </Button>
               </div>
@@ -159,7 +172,11 @@ export function AppShellMain({
                                     <span className="size-1.5 rounded-full bg-muted-foreground/60" />
                                   </div>
                                   <span className="text-muted-foreground">
-                                    {t(locale, 'emptyState', 'pendingReplyLabel')}
+                                    {t(
+                                      locale,
+                                      'emptyState',
+                                      'pendingReplyLabel',
+                                    )}
                                   </span>
                                 </div>
                               ) : (
@@ -195,7 +212,7 @@ export function AppShellMain({
               <Textarea
                 aria-label={t(locale, 'emptyState', 'inputPlaceholder')}
                 className="min-h-24 resize-none border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
-                disabled={!currentChat || isGenerating}
+                disabled={!currentChat || isGenerating || isGuestLimitReached}
                 onChange={(event) => onInputChange(event.target.value)}
                 onCompositionEnd={() => {
                   isComposingRef.current = false
@@ -226,11 +243,11 @@ export function AppShellMain({
               <div className="mt-3 flex items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">
-                    {!currentChat
-                      ? t(locale, 'emptyState', 'emptyInputGuard')
-                      : isGenerating
-                        ? t(locale, 'emptyState', 'pendingInputDescription')
-                        : t(locale, 'emptyState', 'inputDescription')}
+                    {isGuestUsageLoading
+                      ? t(locale, 'emptyState', 'guestUsageLoading')
+                      : isGuestLimitReached
+                        ? t(locale, 'emptyState', 'guestUsageReached')
+                        : `${t(locale, 'emptyState', 'guestUsageRemainingPrefix')} ${guestRemainingCount}/${guestLimit} ${t(locale, 'emptyState', 'guestUsageRemainingSuffix')}`}
                   </div>
                   {requestError ? (
                     <div className="text-xs text-destructive">
@@ -243,6 +260,7 @@ export function AppShellMain({
                   className="rounded-full"
                   disabled={
                     !currentChat ||
+                    isGuestLimitReached ||
                     isGenerating ||
                     inputValue.trim().length === 0
                   }

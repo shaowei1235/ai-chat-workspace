@@ -56,9 +56,13 @@ export const messages: Record<Locale, MessageDictionary> = {
       chatLoadErrorMessage: '当前对话加载失败，请重试或切换其他对话。',
       chatMissingMessage: '当前对话不存在，已回退到可用状态。',
       messageAreaTitle: '开始发送你的第一条消息',
-      inputDescription: '发送后 AI 会逐步生成回复。',
       pendingInputDescription: 'AI 正在流式生成回复，请稍候…',
       requestErrorMessage: '回复生成失败，请稍后再试。',
+      guestUsageLoading: '正在读取 Guest 试用额度…',
+      guestUsageRemainingPrefix: 'Guest 剩余',
+      guestUsageRemainingSuffix: '次',
+      guestUsageReached: 'Guest 试用额度已用尽',
+      guestUsageReachedDescription: '当前已达到 Guest 上限，暂时无法继续发送。',
       sendButtonLabel: '发送消息',
       emptyChatTitle: '这个会话还没有消息',
       emptyChatDescription:
@@ -99,12 +103,14 @@ export const messages: Record<Locale, MessageDictionary> = {
       renameChatErrorFailed:
         'チャット名の変更に失敗しました。しばらくしてから再度お試しください。',
       deleteChatLabel: 'チャットを削除',
-      deleteChatError: 'チャットの削除に失敗しました。しばらくしてから再度お試しください。',
+      deleteChatError:
+        'チャットの削除に失敗しました。しばらくしてから再度お試しください。',
       emptyTitle: 'まだチャット履歴がありません',
       emptyDescription: '上の「新規チャット」を押して最初の会話を始めます。',
       newChatDefaultTitle: '新しいチャット',
       loadErrorTitle: 'チャット一覧の読み込みに失敗しました',
-      loadErrorDescription: '現在チャット一覧を取得できません。再試行してください。',
+      loadErrorDescription:
+        '現在チャット一覧を取得できません。再試行してください。',
       userSectionTitle: 'アカウント',
       userName: 'Workspace User',
       userRole: 'Personal Plan',
@@ -121,11 +127,16 @@ export const messages: Record<Locale, MessageDictionary> = {
       chatMissingMessage:
         '現在のチャットは存在しないため、利用可能な状態に戻しました。',
       messageAreaTitle: '最初のメッセージを送信してください',
-      inputDescription: '送信後に AI が返信を少しずつ生成します。',
       pendingInputDescription:
         'AI が返信をストリーミング中です。しばらくお待ちください…',
       requestErrorMessage:
         '返信の生成に失敗しました。しばらくしてから再度お試しください。',
+      guestUsageLoading: 'Guest 利用回数を読み込み中です…',
+      guestUsageRemainingPrefix: 'Guest 残り',
+      guestUsageRemainingSuffix: '回',
+      guestUsageReached: 'Guest の試用回数を使い切りました',
+      guestUsageReachedDescription:
+        'Guest 上限に達したため、これ以上送信できません。',
       sendButtonLabel: 'メッセージを送信',
       emptyChatTitle: 'この会話にはまだメッセージがありません',
       emptyChatDescription:
