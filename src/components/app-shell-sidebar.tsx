@@ -37,8 +37,8 @@ export function AppShellSidebar({
   onSelectChat,
 }: AppShellSidebarProps) {
   return (
-    <aside className="w-full border-border/60 bg-muted/15 md:min-h-dvh md:w-72 md:border-r">
-      <div className="flex h-full min-h-dvh flex-col justify-between">
+    <aside className="w-full border-border/60 bg-muted/15 md:h-dvh md:w-72 md:shrink-0 md:overflow-hidden md:border-r">
+      <div className="flex h-full min-h-dvh flex-col justify-between md:min-h-0">
         <header className="border-border/60 px-4 py-4 md:border-b">
           <div className="text-sm font-semibold tracking-tight">
             {t(locale, 'common', 'appName')}
