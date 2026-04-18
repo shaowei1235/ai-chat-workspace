@@ -24,6 +24,10 @@ export const messages: Record<Locale, MessageDictionary> = {
     sidebar: {
       newChat: '新建对话',
       chatSectionTitle: '对话',
+      renameChatLabel: '重命名对话',
+      renameChatErrorEmpty: '标题不能为空。',
+      renameChatErrorTooLong: '标题最多支持 50 个字符。',
+      renameChatErrorFailed: '重命名失败，请稍后再试。',
       deleteChatLabel: '删除对话',
       deleteChatError: '删除对话失败，请稍后再试。',
       emptyTitle: '还没有历史对话',
@@ -75,6 +79,11 @@ export const messages: Record<Locale, MessageDictionary> = {
     sidebar: {
       newChat: '新規チャット',
       chatSectionTitle: 'チャット',
+      renameChatLabel: 'チャット名を変更',
+      renameChatErrorEmpty: 'タイトルは空にできません。',
+      renameChatErrorTooLong: 'タイトルは 50 文字以内で入力してください。',
+      renameChatErrorFailed:
+        'チャット名の変更に失敗しました。しばらくしてから再度お試しください。',
       deleteChatLabel: 'チャットを削除',
       deleteChatError: 'チャットの削除に失敗しました。しばらくしてから再度お試しください。',
       emptyTitle: 'まだチャット履歴がありません',

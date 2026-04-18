@@ -1,8 +1,11 @@
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { MessageSquare, Plus, Trash2, UserCircle2 } from 'lucide-react'
+import { MessageSquare, Pencil, Plus, Trash2, UserCircle2 } from 'lucide-react'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 import type { ChatSummary } from '@/types/chat'
+
+const MAX_CHAT_TITLE_LENGTH = 50
 
 type AppShellSidebarProps = {
   chatActionError: string | null
@@ -12,6 +15,7 @@ type AppShellSidebarProps = {
   locale: Locale
   onCreateChat: () => void
   onDeleteChat: (chatId: string) => void
+  onRenameChat: (chatId: string, nextTitle: string) => Promise<void>
   onRetryChatList: () => void
   onSelectChat: (chatId: string) => void
 }
@@ -33,9 +37,75 @@ export function AppShellSidebar({
   locale,
   onCreateChat,
   onDeleteChat,
+  onRenameChat,
   onRetryChatList,
   onSelectChat,
 }: AppShellSidebarProps) {
+  const [editingChatId, setEditingChatId] = useState<string | null>(null)
+  const [draftTitle, setDraftTitle] = useState('')
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const isComposingRef = useRef(false)
+
+  useEffect(() => {
+    if (!editingChatId) {
+      return
+    }
+
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [editingChatId])
+
+  function startEditingChat(chat: ChatSummary) {
+    setEditingChatId(chat.id)
+    setDraftTitle(chat.title)
+    setRenameError(null)
+  }
+
+  function cancelEditingChat() {
+    setEditingChatId(null)
+    setDraftTitle('')
+    setRenameError(null)
+    isComposingRef.current = false
+  }
+
+  function validateDraftTitle() {
+    const trimmedTitle = draftTitle.trim()
+
+    if (trimmedTitle.length === 0) {
+      setRenameError(t(locale, 'sidebar', 'renameChatErrorEmpty'))
+      return null
+    }
+
+    if (trimmedTitle.length > MAX_CHAT_TITLE_LENGTH) {
+      setRenameError(t(locale, 'sidebar', 'renameChatErrorTooLong'))
+      return null
+    }
+
+    setRenameError(null)
+    return trimmedTitle
+  }
+
+  async function submitRenameChat(chat: ChatSummary) {
+    const nextTitle = validateDraftTitle()
+
+    if (!nextTitle) {
+      return
+    }
+
+    if (nextTitle === chat.title) {
+      cancelEditingChat()
+      return
+    }
+
+    try {
+      await onRenameChat(chat.id, nextTitle)
+      cancelEditingChat()
+    } catch {
+      setRenameError(t(locale, 'sidebar', 'renameChatErrorFailed'))
+    }
+  }
+
   return (
     <aside className="w-full border-border/60 bg-muted/15 md:h-dvh md:w-72 md:shrink-0 md:overflow-hidden md:border-r">
       <div className="flex h-full min-h-dvh flex-col justify-between md:min-h-0">
@@ -100,19 +170,19 @@ export function AppShellSidebar({
                 <div className="space-y-1">
                   {chats.map((chat) => {
                     const isActive = chat.id === currentChatId
+                    const isEditing = chat.id === editingChatId
 
                     return (
-                      <button
+                      <div
                         key={chat.id}
                         className={cn(
                           'group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors outline-none',
-                          'hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30',
+                          'hover:bg-muted/40',
                           isActive
                             ? 'bg-primary/10 text-foreground dark:bg-primary/15'
                             : 'text-foreground',
+                          isEditing && 'items-start',
                         )}
-                        onClick={() => onSelectChat(chat.id)}
-                        type="button"
                       >
                         <div
                           className={cn(
@@ -122,36 +192,119 @@ export function AppShellSidebar({
                         >
                           <MessageSquare className="size-4" />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">{chat.title}</div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {formatChatCreatedAt(locale, chat.updatedAt)}
+                        {isEditing ? (
+                          <div className="min-w-0 flex-1">
+                            <input
+                              aria-label={t(locale, 'sidebar', 'renameChatLabel')}
+                              className={cn(
+                                'w-full rounded-md border border-border/70 bg-background px-2.5 py-1.5 text-sm font-medium outline-none transition-colors',
+                                'focus:border-ring focus:ring-2 focus:ring-ring/30',
+                                'dark:bg-background/80',
+                                renameError &&
+                                  'border-destructive/50 focus:border-destructive/60 focus:ring-destructive/20',
+                              )}
+                              maxLength={MAX_CHAT_TITLE_LENGTH}
+                              onBlur={() => {
+                                const trimmedTitle = draftTitle.trim()
+
+                                if (trimmedTitle.length === 0) {
+                                  cancelEditingChat()
+                                  return
+                                }
+
+                                void submitRenameChat(chat)
+                              }}
+                              onChange={(event) => {
+                                setDraftTitle(event.target.value)
+                                if (renameError) {
+                                  setRenameError(null)
+                                }
+                              }}
+                              onCompositionEnd={() => {
+                                isComposingRef.current = false
+                              }}
+                              onCompositionStart={() => {
+                                isComposingRef.current = true
+                              }}
+                              onKeyDown={(event) => {
+                                const isComposing =
+                                  event.nativeEvent.isComposing || isComposingRef.current
+
+                                if (event.key === 'Escape') {
+                                  event.preventDefault()
+                                  cancelEditingChat()
+                                  return
+                                }
+
+                                if (event.key === 'Enter' && !isComposing) {
+                                  event.preventDefault()
+                                  void submitRenameChat(chat)
+                                }
+                              }}
+                              ref={inputRef}
+                              type="text"
+                              value={draftTitle}
+                            />
+                            {renameError ? (
+                              <div className="mt-1 px-1 text-xs text-destructive">
+                                {renameError}
+                              </div>
+                            ) : (
+                              <div className="mt-1 px-1 text-xs text-muted-foreground">
+                                {formatChatCreatedAt(locale, chat.updatedAt)}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <span
-                          aria-hidden="true"
-                          className="pointer-events-none absolute inset-y-0 right-0 w-14 rounded-r-xl bg-gradient-to-l from-background/90 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
-                        />
-                        <span
-                          className={cn(
-                            'relative z-10 flex shrink-0 items-center',
-                            'opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100',
-                          )}
-                        >
-                          <button
-                            aria-label={t(locale, 'sidebar', 'deleteChatLabel')}
-                            className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:bg-destructive/15"
-                            onClick={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              onDeleteChat(chat.id)
-                            }}
-                            type="button"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </span>
-                      </button>
+                        ) : (
+                          <>
+                            <button
+                              className="min-w-0 flex-1 rounded-lg text-left outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                              onClick={() => onSelectChat(chat.id)}
+                              type="button"
+                            >
+                              <div className="truncate text-sm font-medium">{chat.title}</div>
+                              <div className="truncate text-xs text-muted-foreground">
+                                {formatChatCreatedAt(locale, chat.updatedAt)}
+                              </div>
+                            </button>
+                            <span
+                              aria-hidden="true"
+                              className="pointer-events-none absolute inset-y-0 right-0 w-20 rounded-r-xl bg-gradient-to-l from-background/90 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+                            />
+                            <span
+                              className={cn(
+                                'relative z-10 flex shrink-0 items-center',
+                                'opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100',
+                              )}
+                            >
+                              <button
+                                aria-label={t(locale, 'sidebar', 'renameChatLabel')}
+                                className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                onClick={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  startEditingChat(chat)
+                                }}
+                                type="button"
+                              >
+                                <Pencil className="size-4" />
+                              </button>
+                              <button
+                                aria-label={t(locale, 'sidebar', 'deleteChatLabel')}
+                                className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:bg-destructive/15"
+                                onClick={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  onDeleteChat(chat.id)
+                                }}
+                                type="button"
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </span>
+                          </>
+                        )}
+                      </div>
                     )
                   })}
                 </div>

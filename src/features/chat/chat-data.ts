@@ -170,3 +170,26 @@ export async function deleteChat(chatId: string): Promise<void> {
     },
   })
 }
+
+export async function renameChat(
+  chatId: string,
+  title: string,
+): Promise<ChatSummary> {
+  const chat = await prisma.chat.update({
+    where: {
+      id: chatId,
+    },
+    data: {
+      title,
+      updatedAt: new Date(),
+    },
+    select: {
+      id: true,
+      title: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  })
+
+  return mapPrismaChatSummary(chat)
+}

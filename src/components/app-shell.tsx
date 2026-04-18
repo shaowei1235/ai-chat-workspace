@@ -26,6 +26,10 @@ type ChatResponse = {
   chat: Chat
 }
 
+type RenameChatResponse = {
+  chat: ChatSummary
+}
+
 type ErrorResponse = {
   error?: string
 }
@@ -281,6 +285,51 @@ export function AppShell({
     }
   }
 
+  // 重命名对话：保存成功后，同时同步 sidebar 列表和当前主区域标题。
+  async function handleRenameChat(chatId: string, nextTitle: string) {
+    try {
+      const response = await fetch(`/api/chats/${chatId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: nextTitle,
+        }),
+      })
+      const data = await readJson<RenameChatResponse>(response)
+      const renamedChat = data.chat
+
+      setChatSummaries((previousChats) =>
+        sortChatSummaries(
+          previousChats.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  title: renamedChat.title,
+                  updatedAt: renamedChat.updatedAt,
+                }
+              : chat,
+          ),
+        ),
+      )
+      setCurrentChat((previousChat) =>
+        previousChat && previousChat.id === chatId
+          ? {
+              ...previousChat,
+              title: renamedChat.title,
+              updatedAt: renamedChat.updatedAt,
+            }
+          : previousChat,
+      )
+      setChatActionError(null)
+      setChatLoadError(null)
+    } catch (error) {
+      console.error('重命名数据库对话失败', error)
+      throw error
+    }
+  }
+
   // 切换当前会话：读取目标 chat 的数据库内容，并处理它不存在或加载失败的情况。
   async function handleSelectChat(chatId: string) {
     try {
@@ -520,6 +569,7 @@ export function AppShell({
         locale={locale}
         onCreateChat={handleCreateChat}
         onDeleteChat={handleDeleteChat}
+        onRenameChat={handleRenameChat}
         onRetryChatList={handleRetryChatList}
         onSelectChat={handleSelectChat}
       />
