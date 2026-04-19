@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { signIn } from 'next-auth/react'
+import { AssistantMarkdown } from '@/components/assistant-markdown'
 import { ChatExampleGuide } from '@/components/chat-example-guide'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -201,9 +202,13 @@ export function AppShellMain({
                                   </span>
                                 </div>
                               ) : (
-                                <div className="whitespace-pre-wrap break-words">
-                                  {message.content}
-                                </div>
+                                message.role === 'assistant' ? (
+                                  <AssistantMarkdown content={message.content} />
+                                ) : (
+                                  <div className="whitespace-pre-wrap break-words">
+                                    {message.content}
+                                  </div>
+                                )
                               )}
                             </div>
                           </div>
