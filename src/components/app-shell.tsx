@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { t, type Locale } from '@/i18n/messages'
 import { AppShellMain } from '@/components/app-shell-main'
 import { AppShellSidebar } from '@/components/app-shell-sidebar'
@@ -50,6 +50,10 @@ type GuestUsageResponse = {
 const LOCAL_REQUEST_ERROR_LOG = '获取 AI 流式回复失败'
 const LOCAL_STREAM_PARSE_ERROR = '流式响应解析失败'
 const DEFAULT_GUEST_LIMIT = 10
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === 'AbortError'
+}
 
 class AppShellRequestError extends Error {
   constructor(
@@ -103,6 +107,7 @@ export function AppShell({
     usedCount: 0,
   })
   const [isGuestUsageLoading, setIsGuestUsageLoading] = useState(true)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const isGenerating = generatingChatId !== null
   const isCurrentChatGenerating =
@@ -208,6 +213,12 @@ export function AppShell({
       setIsGuestUsageLoading(false)
     })
   }, [isAuthenticated, refreshGuestUsage])
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [])
 
   // 当 sidebar 列表读取失败时，给“重试”按钮使用的最小恢复动作。
   async function handleRetryChatList() {
@@ -460,12 +471,14 @@ export function AppShell({
     chatId: string,
     content: string,
     assistantMessageId: string,
+    signal: AbortSignal,
   ) {
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal,
       body: JSON.stringify({ chatId, content }),
     })
 
@@ -562,6 +575,11 @@ export function AppShell({
     }
   }
 
+  // 用户主动停止当前 streaming：只中断请求，不回滚已生成内容。
+  function handleStopGenerating() {
+    abortControllerRef.current?.abort()
+  }
+
   // 发送消息的主入口：先做本地 UI 占位，再请求服务端写 user message、生成 assistant，并在失败时恢复状态。
   async function handleSendMessage() {
     const trimmedValue = inputValue.trim()
@@ -643,9 +661,22 @@ export function AppShell({
     setInputValue('')
 
     try {
-      await streamAssistantReply(targetChatId, trimmedValue, assistantMessageId)
+      const abortController = new AbortController()
+      abortControllerRef.current = abortController
+
+      await streamAssistantReply(
+        targetChatId,
+        trimmedValue,
+        assistantMessageId,
+        abortController.signal,
+      )
       await Promise.all([refreshChatList(), loadChat(targetChatId)])
     } catch (error) {
+      if (isAbortError(error)) {
+        setRequestError(null)
+        return
+      }
+
       console.error(LOCAL_REQUEST_ERROR_LOG, error)
       if (
         error instanceof AppShellRequestError &&
@@ -684,6 +715,7 @@ export function AppShell({
         }
       }
     } finally {
+      abortControllerRef.current = null
       setGeneratingChatId(null)
       setGeneratingMessageId(null)
     }
@@ -721,6 +753,7 @@ export function AppShell({
         requestError={requestError}
         onInputChange={handleInputChange}
         onSendMessage={handleSendMessage}
+        onStopGenerating={handleStopGenerating}
       />
     </div>
   )

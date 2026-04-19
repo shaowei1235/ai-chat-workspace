@@ -4,7 +4,7 @@ import { AssistantMarkdown } from '@/components/assistant-markdown'
 import { ChatExampleGuide } from '@/components/chat-example-guide'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowUp, Github } from 'lucide-react'
+import { ArrowUp, Github, Square } from 'lucide-react'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 import type { AuthUser } from '@/types/auth'
@@ -27,6 +27,7 @@ type AppShellMainProps = {
   requestError: string | null
   onInputChange: (nextValue: string) => void
   onSendMessage: () => void
+  onStopGenerating: () => void
 }
 
 export function AppShellMain({
@@ -46,6 +47,7 @@ export function AppShellMain({
   requestError,
   onInputChange,
   onSendMessage,
+  onStopGenerating,
 }: AppShellMainProps) {
   const isComposingRef = useRef(false)
   const messageScrollViewportRef = useRef<HTMLDivElement | null>(null)
@@ -300,19 +302,33 @@ export function AppShellMain({
                   ) : null}
                 </div>
                 <Button
-                  aria-label={t(locale, 'emptyState', 'sendButtonLabel')}
+                  aria-label={
+                    isGenerating
+                      ? t(locale, 'emptyState', 'stopGeneratingLabel')
+                      : t(locale, 'emptyState', 'sendButtonLabel')
+                  }
                   className="rounded-full"
                   disabled={
-                    !currentChat ||
-                    isGuestLimitReached ||
-                    isGenerating ||
-                    inputValue.trim().length === 0
+                    isGenerating
+                      ? false
+                      : !currentChat ||
+                        isGuestLimitReached ||
+                        inputValue.trim().length === 0
                   }
-                  onClick={onSendMessage}
+                  onClick={isGenerating ? onStopGenerating : onSendMessage}
                   size="icon-sm"
+                  title={
+                    isGenerating
+                      ? t(locale, 'emptyState', 'stopGeneratingLabel')
+                      : t(locale, 'emptyState', 'sendButtonLabel')
+                  }
                   type="button"
                 >
-                  <ArrowUp className="size-4" />
+                  {isGenerating ? (
+                    <Square className="size-3.5 fill-current" />
+                  ) : (
+                    <ArrowUp className="size-4" />
+                  )}
                 </Button>
               </div>
             </div>

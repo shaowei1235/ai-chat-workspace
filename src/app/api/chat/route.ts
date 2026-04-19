@@ -87,6 +87,7 @@ export async function POST(request: Request) {
 
     const stream = await streamAssistantReply({
       messages,
+      signal: request.signal,
       onDelta(delta) {
         assistantContent += delta
       },
@@ -124,6 +125,13 @@ export async function POST(request: Request) {
 
     return response
   } catch (error) {
+    if (
+      request.signal.aborted ||
+      (error instanceof Error && error.name === 'AbortError')
+    ) {
+      return new Response(null, { status: 204 })
+    }
+
     if (error instanceof GuestLimitReachedError) {
       return NextResponse.json(
         {

@@ -10,6 +10,7 @@ type OpenAIMessageInput = {
 
 export type StreamAssistantReplyParams = {
   messages: ChatMessage[]
+  signal?: AbortSignal
   onDelta?: (delta: string) => void | Promise<void>
   onComplete?: () => void | Promise<void>
   onError?: (message: string) => void | Promise<void>
@@ -71,6 +72,7 @@ function parseSseChunk(chunk: string) {
 
 export async function streamAssistantReply({
   messages,
+  signal,
   onDelta,
   onComplete,
   onError,
@@ -83,6 +85,7 @@ export async function streamAssistantReply({
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
+    signal,
     body: JSON.stringify({
       model,
       stream: true,
@@ -168,6 +171,11 @@ export async function streamAssistantReply({
         }
         controller.close()
       } catch (error) {
+        if (signal?.aborted) {
+          controller.close()
+          return
+        }
+
         const message =
           error instanceof Error ? error.message : 'AI 流式回复失败'
         await onError?.(message)

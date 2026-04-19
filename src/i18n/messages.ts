@@ -66,6 +66,7 @@ export const messages: Record<Locale, MessageDictionary> = {
       guestUsageLoggedIn: '已登录，当前不受 Guest 试用限额影响。',
       continueWithGitHub: 'GitHub 登录继续使用',
       sendButtonLabel: '发送消息',
+      stopGeneratingLabel: '停止生成',
       emptyChatTitle: '这个会话还没有消息',
       emptyChatDescription:
         '在底部输入框里发送第一条消息，先建立最小聊天交互。',
@@ -166,6 +167,7 @@ export const messages: Record<Locale, MessageDictionary> = {
         'ログイン済みのため、Guest 試用回数の制限を受けません。',
       continueWithGitHub: 'GitHub にログインして続行',
       sendButtonLabel: 'メッセージを送信',
+      stopGeneratingLabel: '生成を停止',
       emptyChatTitle: 'この会話にはまだメッセージがありません',
       emptyChatDescription:
         '下の入力欄から最初のメッセージを送って、最小の会話フローを作ります。',
