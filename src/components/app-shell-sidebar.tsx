@@ -297,7 +297,10 @@ export function AppShellSidebar({
                                 {renameError}
                               </div>
                             ) : (
-                              <div className="mt-1 px-1 text-xs text-muted-foreground">
+                              <div
+                                className="mt-1 px-1 text-xs text-muted-foreground"
+                                suppressHydrationWarning
+                              >
                                 {formatChatCreatedAt(locale, chat.updatedAt)}
                               </div>
                             )}
@@ -305,12 +308,20 @@ export function AppShellSidebar({
                         ) : (
                           <>
                             <button
-                              className="min-w-0 flex-1 rounded-lg text-left outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                              className="min-w-0 flex-1 cursor-pointer rounded-lg text-left outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
                               onClick={() => onSelectChat(chat.id)}
                               type="button"
                             >
-                              <div className="truncate text-sm font-medium">{chat.title}</div>
-                              <div className="truncate text-xs text-muted-foreground">
+                              <div
+                                className="truncate text-sm font-medium"
+                                suppressHydrationWarning
+                              >
+                                {chat.title}
+                              </div>
+                              <div
+                                className="truncate text-xs text-muted-foreground"
+                                suppressHydrationWarning
+                              >
                                 {formatChatCreatedAt(locale, chat.updatedAt)}
                               </div>
                             </button>
@@ -326,7 +337,7 @@ export function AppShellSidebar({
                             >
                               <button
                                 aria-label={t(locale, 'sidebar', 'renameChatLabel')}
-                                className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                                 onClick={(event) => {
                                   event.preventDefault()
                                   event.stopPropagation()
@@ -338,7 +349,7 @@ export function AppShellSidebar({
                               </button>
                               <button
                                 aria-label={t(locale, 'sidebar', 'deleteChatLabel')}
-                                className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:bg-destructive/15"
+                                className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:bg-destructive/15"
                                 onClick={(event) => {
                                   event.preventDefault()
                                   event.stopPropagation()
@@ -452,7 +463,10 @@ export function AppShellSidebar({
                     <div className="px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
                       {t(locale, 'sidebar', 'themeLabel')}
                     </div>
-                    <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-1">
+                    <div
+                      className="flex items-center justify-between gap-3 rounded-lg px-1 py-1"
+                      suppressHydrationWarning
+                    >
                       <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                         {activeTheme === 'dark' ? (
                           <Moon className="size-3.5 shrink-0" />

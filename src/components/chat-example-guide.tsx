@@ -37,7 +37,7 @@ export function ChatExampleGuide({
             <div className="flex flex-wrap gap-2.5">
               {group.presets.map((preset) => (
                 <button
-                  className="rounded-full border border-border/60 bg-muted/20 px-3.5 py-2 text-sm text-foreground transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-muted/15 dark:hover:bg-muted/30"
+                  className="cursor-pointer rounded-full border border-border/60 bg-muted/20 px-3.5 py-2 text-sm text-foreground transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-muted/15 dark:hover:bg-muted/30"
                   key={preset.id}
                   onClick={() => onSelectPrompt(preset.prompt)}
                   suppressHydrationWarning

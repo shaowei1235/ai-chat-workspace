@@ -28,6 +28,7 @@ export function AssistantMarkdown({ content }: AssistantMarkdownProps) {
         '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[13px] [&_pre_code]:leading-6',
         'dark:[&_code]:bg-muted/50 dark:[&_pre]:bg-background/40',
       )}
+      suppressHydrationWarning
     >
       <ReactMarkdown
         components={{

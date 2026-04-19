@@ -97,12 +97,33 @@ export function AppShellMain({
     generatingMessageId,
   ])
 
+  useEffect(() => {
+    if (!hasCurrentChat || isGenerating || isGuestLimitReached) {
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      if (!inputRef.current || inputRef.current.disabled) {
+        return
+      }
+
+      inputRef.current.focus()
+      const textLength = inputRef.current.value.length
+      inputRef.current.setSelectionRange(textLength, textLength)
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [hasCurrentChat, currentChat?.id, isGenerating, isGuestLimitReached])
+
   return (
     <main className="flex min-h-dvh flex-1 flex-col bg-background px-6 md:h-dvh md:min-h-0 md:overflow-hidden md:px-10">
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden">
         <header className="shrink-0 pt-8 pb-6 md:pt-10">
           <div className="max-w-2xl">
-            <div className="text-2xl font-semibold tracking-tight">
+            <div
+              className="text-2xl font-semibold tracking-tight"
+              suppressHydrationWarning
+            >
               {currentChat?.title ?? t(locale, 'emptyState', 'title')}
             </div>
             <div className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -207,7 +228,10 @@ export function AppShellMain({
                                 message.role === 'assistant' ? (
                                   <AssistantMarkdown content={message.content} />
                                 ) : (
-                                  <div className="whitespace-pre-wrap break-words">
+                                  <div
+                                    className="whitespace-pre-wrap break-words"
+                                    suppressHydrationWarning
+                                  >
                                     {message.content}
                                   </div>
                                 )
