@@ -8,6 +8,7 @@ const LOCAL_STREAM_PARSE_ERROR = '流式响应解析失败'
 type ConsumeAssistantStreamParams = {
   chatId: string
   content: string
+  mode?: 'send' | 'regenerate'
   signal: AbortSignal
   onDelta: (content: string) => void
   onGuestUsage: (guestUsage: GuestUsageInfo) => void
@@ -22,6 +23,7 @@ type ErrorResponse = {
 export async function consumeAssistantStream({
   chatId,
   content,
+  mode = 'send',
   signal,
   onDelta,
   onGuestUsage,
@@ -32,7 +34,7 @@ export async function consumeAssistantStream({
       'Content-Type': 'application/json',
     },
     signal,
-    body: JSON.stringify({ chatId, content }),
+    body: JSON.stringify({ chatId, content, mode }),
   })
 
   if (!response.ok || !response.body) {

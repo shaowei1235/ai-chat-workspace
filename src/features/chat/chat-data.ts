@@ -163,6 +163,14 @@ export async function listMessagesByChatId(chatId: string): Promise<ChatMessage[
   return messages.map(mapPrismaMessage)
 }
 
+export async function deleteMessage(messageId: string): Promise<void> {
+  await prisma.message.delete({
+    where: {
+      id: messageId,
+    },
+  })
+}
+
 export async function deleteChat(chatId: string): Promise<void> {
   await prisma.chat.delete({
     where: {

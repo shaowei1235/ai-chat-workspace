@@ -365,10 +365,12 @@ export function useAppShellController({
     content: string,
     assistantMessageId: string,
     signal: AbortSignal,
+    mode: 'send' | 'regenerate' = 'send',
   ) {
     await consumeAssistantStream({
       chatId,
       content,
+      mode,
       signal,
       onDelta: (nextContent) => {
         updateAssistantMessageContent(chatId, assistantMessageId, nextContent)
@@ -382,6 +384,109 @@ export function useAppShellController({
   // 用户主动停止当前 streaming：只中断请求，不回滚已生成内容。
   function handleStopGenerating() {
     abortControllerRef.current?.abort()
+  }
+
+  // 重新生成只处理最后一轮：最后一条 assistant 会被新流式结果替换。
+  async function handleRegenerateResponse() {
+    if (!currentChat || !currentChatId || isGenerating) {
+      return
+    }
+
+    const lastMessage = currentChat.messages[currentChat.messages.length - 1]
+    const lastUserMessage = currentChat.messages[currentChat.messages.length - 2]
+
+    if (
+      !lastMessage ||
+      !lastUserMessage ||
+      lastMessage.role !== 'assistant' ||
+      lastUserMessage.role !== 'user'
+    ) {
+      return
+    }
+
+    const targetChatId = currentChatId
+    const previousChatSnapshot = currentChat
+    const previousChatSummaries = chatSummaries
+    const assistantMessageId = crypto.randomUUID()
+    const assistantPlaceholder: ChatMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      createdAt: new Date().toISOString(),
+    }
+
+    setCurrentChat((previousChat) => {
+      if (!previousChat || previousChat.id !== targetChatId) {
+        return previousChat
+      }
+
+      return {
+        ...previousChat,
+        messages: [...previousChat.messages.slice(0, -1), assistantPlaceholder],
+      }
+    })
+
+    setRequestError(null)
+    setChatActionError(null)
+    setChatLoadError(null)
+    setGeneratingChatId(targetChatId)
+    setGeneratingMessageId(assistantMessageId)
+
+    try {
+      const abortController = new AbortController()
+      abortControllerRef.current = abortController
+
+      await streamAssistantReply(
+        targetChatId,
+        lastUserMessage.content,
+        assistantMessageId,
+        abortController.signal,
+        'regenerate',
+      )
+      await Promise.all([refreshChatList(), loadChat(targetChatId)])
+    } catch (error) {
+      if (isAbortError(error)) {
+        setRequestError(null)
+
+        try {
+          await Promise.all([refreshChatList(), loadChat(targetChatId)])
+        } catch (syncError) {
+          console.error('停止重新生成后的数据库同步失败', syncError)
+        }
+
+        return
+      }
+
+      console.error('重新生成 AI 回复失败', error)
+      setRequestError(t(locale, 'emptyState', 'requestErrorMessage'))
+
+      try {
+        await Promise.all([refreshChatList(), loadChat(targetChatId)])
+      } catch (syncError) {
+        if (
+          syncError instanceof AppShellRequestError &&
+          syncError.status === 404
+        ) {
+          try {
+            await syncFallbackChat()
+            setChatLoadError(t(locale, 'emptyState', 'chatMissingMessage'))
+          } catch (fallbackError) {
+            console.error('重新生成失败后的对话回退失败', fallbackError)
+            setCurrentChat(previousChatSnapshot)
+            setChatSummaries(previousChatSummaries)
+            setChatLoadError(t(locale, 'emptyState', 'chatLoadErrorMessage'))
+          }
+        } else {
+          console.error('重新生成失败后的数据库同步失败', syncError)
+          setCurrentChat(previousChatSnapshot)
+          setChatSummaries(previousChatSummaries)
+        }
+      }
+    } finally {
+      abortControllerRef.current = null
+      setGeneratingChatId(null)
+      setGeneratingMessageId(null)
+    }
   }
 
   // 发送消息的主入口：先做本地 UI 占位，再请求服务端写 user message、生成 assistant，并在失败时恢复状态。
@@ -473,6 +578,7 @@ export function useAppShellController({
         trimmedValue,
         assistantMessageId,
         abortController.signal,
+        'send',
       )
       await Promise.all([refreshChatList(), loadChat(targetChatId)])
     } catch (error) {
@@ -538,6 +644,7 @@ export function useAppShellController({
     handleDeleteChat,
     handleInputChange,
     handleRenameChat,
+    handleRegenerateResponse,
     handleRetryChatList,
     handleRetryCurrentChat,
     handleSelectChat,

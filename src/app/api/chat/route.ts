@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { authOptions } from '@/auth'
 import {
   createMessage,
+  deleteMessage,
   getChatById,
   listMessagesByChatId,
 } from '@/features/chat/chat-data'
@@ -24,6 +25,7 @@ import { streamAssistantReply } from '@/lib/ai/openai'
 type ChatRouteBody = {
   chatId?: string
   content?: string
+  mode?: 'send' | 'regenerate'
 }
 
 export async function POST(request: Request) {
@@ -36,13 +38,14 @@ export async function POST(request: Request) {
     )
     const body = (await request.json()) as ChatRouteBody
     const chatId = body.chatId
+    const mode = body.mode === 'regenerate' ? 'regenerate' : 'send'
     const content = body.content?.trim()
 
     if (typeof chatId !== 'string' || chatId.length === 0) {
       return NextResponse.json({ error: 'INVALID_CHAT_ID' }, { status: 400 })
     }
 
-    if (!content) {
+    if (mode === 'send' && !content) {
       return NextResponse.json({ error: 'INVALID_MESSAGE_CONTENT' }, { status: 400 })
     }
 
@@ -52,34 +55,55 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'CHAT_NOT_FOUND' }, { status: 404 })
     }
 
-    const nextChatTitle = shouldAutoUpdateChatTitle({
-      currentTitle: existingChat.title,
-      existingMessageCount: existingChat.messages.length,
-      firstUserMessageContent: content,
-    })
-      ? createChatTitleFromMessage(content)
-      : null
+    let guestUsage = null
 
-    const guestUsage = isAuthenticated
-      ? null
-      : await consumeGuestUsage(guestId)
-
-    try {
-      await createMessage({
-        chatId,
-        role: 'user',
-        content,
-        ...(nextChatTitle
-          ? {
-              nextChatTitle,
-            }
-          : {}),
+    if (mode === 'send') {
+      const nextChatTitle = shouldAutoUpdateChatTitle({
+        currentTitle: existingChat.title,
+        existingMessageCount: existingChat.messages.length,
+        firstUserMessageContent: content!,
       })
-    } catch (error) {
-      if (!isAuthenticated) {
-        await restoreGuestUsage(guestId)
+        ? createChatTitleFromMessage(content!)
+        : null
+
+      guestUsage = isAuthenticated
+        ? null
+        : await consumeGuestUsage(guestId)
+
+      try {
+        await createMessage({
+          chatId,
+          role: 'user',
+          content: content!,
+          ...(nextChatTitle
+            ? {
+                nextChatTitle,
+              }
+            : {}),
+        })
+      } catch (error) {
+        if (!isAuthenticated) {
+          await restoreGuestUsage(guestId)
+        }
+        throw error
       }
-      throw error
+    } else {
+      const lastMessage = existingChat.messages[existingChat.messages.length - 1]
+      const lastUserMessage = existingChat.messages[existingChat.messages.length - 2]
+
+      if (
+        !lastMessage ||
+        !lastUserMessage ||
+        lastMessage.role !== 'assistant' ||
+        lastUserMessage.role !== 'user'
+      ) {
+        return NextResponse.json(
+          { error: 'INVALID_REGENERATE_TARGET' },
+          { status: 400 },
+        )
+      }
+
+      await deleteMessage(lastMessage.id)
     }
 
     const messages = await listMessagesByChatId(chatId)

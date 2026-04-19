@@ -37,6 +37,7 @@ export function AppShell({
     handleDeleteChat,
     handleInputChange,
     handleRenameChat,
+    handleRegenerateResponse,
     handleRetryChatList,
     handleRetryCurrentChat,
     handleSelectChat,
@@ -88,6 +89,7 @@ export function AppShell({
         onRetryCurrentChat={handleRetryCurrentChat}
         requestError={requestError}
         onInputChange={handleInputChange}
+        onRegenerateResponse={handleRegenerateResponse}
         onSendMessage={handleSendMessage}
         onStopGenerating={handleStopGenerating}
       />

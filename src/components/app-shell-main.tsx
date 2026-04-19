@@ -4,7 +4,7 @@ import { AssistantMarkdown } from '@/components/assistant-markdown'
 import { ChatExampleGuide } from '@/components/chat-example-guide'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowUp, Github, Square } from 'lucide-react'
+import { ArrowUp, Github, RotateCcw, Square } from 'lucide-react'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 import type { AuthUser } from '@/types/auth'
@@ -26,6 +26,7 @@ type AppShellMainProps = {
   onRetryCurrentChat: () => void
   requestError: string | null
   onInputChange: (nextValue: string) => void
+  onRegenerateResponse: () => void
   onSendMessage: () => void
   onStopGenerating: () => void
 }
@@ -46,6 +47,7 @@ export function AppShellMain({
   onRetryCurrentChat,
   requestError,
   onInputChange,
+  onRegenerateResponse,
   onSendMessage,
   onStopGenerating,
 }: AppShellMainProps) {
@@ -173,9 +175,17 @@ export function AppShellMain({
                   className="flex-1 overflow-y-auto pr-2"
                 >
                   <div className="space-y-4 pb-6">
-                    {currentChat.messages.map((message) => {
+                    {currentChat.messages.map((message, index) => {
                       const isGeneratingMessage =
                         message.id === generatingMessageId
+                      const isLastMessage =
+                        currentChat.messages[currentChat.messages.length - 1]?.id ===
+                        message.id
+                      const previousMessage = currentChat.messages[index - 1]
+                      const canRegenerate =
+                        message.role === 'assistant' &&
+                        isLastMessage &&
+                        previousMessage?.role === 'user'
 
                       return (
                         <div
@@ -237,6 +247,19 @@ export function AppShellMain({
                                 )
                               )}
                             </div>
+                            {canRegenerate ? (
+                              <div className="flex justify-start">
+                                <button
+                                  className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-muted/40"
+                                  disabled={isGenerating}
+                                  onClick={onRegenerateResponse}
+                                  type="button"
+                                >
+                                  <RotateCcw className="size-3.5" />
+                                  <span>{t(locale, 'emptyState', 'regenerateLabel')}</span>
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       )
