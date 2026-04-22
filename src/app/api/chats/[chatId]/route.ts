@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { deleteChat, getChatById, renameChat } from '@/features/chat/chat-data'
+import { resolveViewer } from '@/lib/viewer'
 
 const MAX_CHAT_TITLE_LENGTH = 50
 
@@ -11,14 +12,21 @@ type ChatRouteContext = {
 
 export async function GET(_request: Request, context: ChatRouteContext) {
   try {
+    const { guestCookieValue, owner } = await resolveViewer()
     const { chatId } = await context.params
-    const chat = await getChatById(chatId)
+    const chat = await getChatById(chatId, owner)
 
     if (!chat) {
       return NextResponse.json({ error: 'CHAT_NOT_FOUND' }, { status: 404 })
     }
 
-    return NextResponse.json({ chat })
+    const response = NextResponse.json({ chat })
+
+    if (guestCookieValue) {
+      response.headers.set('Set-Cookie', guestCookieValue)
+    }
+
+    return response
   } catch (error) {
     console.error('读取当前对话失败', error)
 
@@ -28,16 +36,23 @@ export async function GET(_request: Request, context: ChatRouteContext) {
 
 export async function DELETE(_request: Request, context: ChatRouteContext) {
   try {
+    const { guestCookieValue, owner } = await resolveViewer()
     const { chatId } = await context.params
-    const chat = await getChatById(chatId)
+    const chat = await getChatById(chatId, owner)
 
     if (!chat) {
       return NextResponse.json({ error: 'CHAT_NOT_FOUND' }, { status: 404 })
     }
 
-    await deleteChat(chatId)
+    await deleteChat(chatId, owner)
 
-    return NextResponse.json({ success: true })
+    const response = NextResponse.json({ success: true })
+
+    if (guestCookieValue) {
+      response.headers.set('Set-Cookie', guestCookieValue)
+    }
+
+    return response
   } catch (error) {
     console.error('删除对话失败', error)
 
@@ -47,8 +62,9 @@ export async function DELETE(_request: Request, context: ChatRouteContext) {
 
 export async function PATCH(request: Request, context: ChatRouteContext) {
   try {
+    const { guestCookieValue, owner } = await resolveViewer()
     const { chatId } = await context.params
-    const chat = await getChatById(chatId)
+    const chat = await getChatById(chatId, owner)
 
     if (!chat) {
       return NextResponse.json({ error: 'CHAT_NOT_FOUND' }, { status: 404 })
@@ -71,9 +87,15 @@ export async function PATCH(request: Request, context: ChatRouteContext) {
       )
     }
 
-    const renamedChat = await renameChat(chatId, nextTitle)
+    const renamedChat = await renameChat(chatId, nextTitle, owner)
 
-    return NextResponse.json({ chat: renamedChat })
+    const response = NextResponse.json({ chat: renamedChat })
+
+    if (guestCookieValue) {
+      response.headers.set('Set-Cookie', guestCookieValue)
+    }
+
+    return response
   } catch (error) {
     console.error('重命名对话失败', error)
 

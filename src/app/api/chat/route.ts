@@ -1,7 +1,4 @@
-import { cookies } from 'next/headers'
-import { getServerSession } from 'next-auth'
 import { NextResponse } from 'next/server'
-import { authOptions } from '@/auth'
 import {
   createMessage,
   deleteMessage,
@@ -9,17 +6,15 @@ import {
   listMessagesByChatId,
 } from '@/features/chat/chat-data'
 import {
-  GUEST_ID_COOKIE_NAME,
   GuestLimitReachedError,
   consumeGuestUsage,
-  createGuestCookieValue,
-  resolveGuestId,
   restoreGuestUsage,
 } from '@/features/guest/guest-data'
 import {
   createChatTitleFromMessage,
   shouldAutoUpdateChatTitle,
 } from '@/features/chat/chat-title'
+import { resolveViewer } from '@/lib/viewer'
 import { streamAssistantReply } from '@/lib/ai/openai'
 
 type ChatRouteBody = {
@@ -30,12 +25,8 @@ type ChatRouteBody = {
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    const isAuthenticated = Boolean(session?.user)
-    const cookieStore = await cookies()
-    const { guestId, shouldSetCookie } = resolveGuestId(
-      cookieStore.get(GUEST_ID_COOKIE_NAME)?.value,
-    )
+    const { guestCookieValue, owner } = await resolveViewer()
+    const isAuthenticated = owner.kind === 'user'
     const body = (await request.json()) as ChatRouteBody
     const chatId = body.chatId
     const mode = body.mode === 'regenerate' ? 'regenerate' : 'send'
@@ -49,7 +40,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'INVALID_MESSAGE_CONTENT' }, { status: 400 })
     }
 
-    const existingChat = await getChatById(chatId)
+    const existingChat = await getChatById(chatId, owner)
 
     if (!existingChat) {
       return NextResponse.json({ error: 'CHAT_NOT_FOUND' }, { status: 404 })
@@ -68,13 +59,14 @@ export async function POST(request: Request) {
 
       guestUsage = isAuthenticated
         ? null
-        : await consumeGuestUsage(guestId)
+        : await consumeGuestUsage(owner.guestId)
 
       try {
         await createMessage({
           chatId,
           role: 'user',
           content: content!,
+          owner,
           ...(nextChatTitle
             ? {
                 nextChatTitle,
@@ -83,7 +75,7 @@ export async function POST(request: Request) {
         })
       } catch (error) {
         if (!isAuthenticated) {
-          await restoreGuestUsage(guestId)
+          await restoreGuestUsage(owner.guestId)
         }
         throw error
       }
@@ -106,7 +98,7 @@ export async function POST(request: Request) {
       await deleteMessage(lastMessage.id)
     }
 
-    const messages = await listMessagesByChatId(chatId)
+    const messages = await listMessagesByChatId(chatId, owner)
     let assistantContent = ''
 
     const stream = await streamAssistantReply({
@@ -124,6 +116,7 @@ export async function POST(request: Request) {
           chatId,
           role: 'assistant',
           content: assistantContent,
+          owner,
         })
       },
     })
@@ -143,8 +136,8 @@ export async function POST(request: Request) {
       },
     })
 
-    if (!isAuthenticated && shouldSetCookie) {
-      response.headers.set('Set-Cookie', createGuestCookieValue(guestId))
+    if (guestCookieValue) {
+      response.headers.set('Set-Cookie', guestCookieValue)
     }
 
     return response

@@ -1,8 +1,29 @@
 import 'server-only'
 
-import { MessageRole } from '@prisma/client'
+import { MessageRole, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import type { ChatOwnerScope } from '@/types/chat-owner'
 import type { Chat, ChatMessage, ChatMessageRole, ChatSummary } from '@/types/chat'
+
+function buildChatOwnerWhere(owner: ChatOwnerScope): Prisma.ChatWhereInput {
+  return owner.kind === 'user'
+    ? {
+        userId: owner.userId,
+      }
+    : {
+        guestId: owner.guestId,
+      }
+}
+
+function buildChatOwnerCreateData(owner: ChatOwnerScope) {
+  return owner.kind === 'user'
+    ? {
+        userId: owner.userId,
+      }
+    : {
+        guestId: owner.guestId,
+      }
+}
 
 function mapMessageRole(role: MessageRole): ChatMessageRole {
   return role === MessageRole.USER ? 'user' : 'assistant'
@@ -54,8 +75,11 @@ function mapPrismaChat(chat: {
   }
 }
 
-export async function listChatSummaries(): Promise<ChatSummary[]> {
+export async function listChatSummaries(
+  owner: ChatOwnerScope,
+): Promise<ChatSummary[]> {
   const chats = await prisma.chat.findMany({
+    where: buildChatOwnerWhere(owner),
     orderBy: {
       updatedAt: 'desc',
     },
@@ -70,10 +94,14 @@ export async function listChatSummaries(): Promise<ChatSummary[]> {
   return chats.map(mapPrismaChatSummary)
 }
 
-export async function getChatById(chatId: string): Promise<Chat | null> {
-  const chat = await prisma.chat.findUnique({
+export async function getChatById(
+  chatId: string,
+  owner: ChatOwnerScope,
+): Promise<Chat | null> {
+  const chat = await prisma.chat.findFirst({
     where: {
       id: chatId,
+      ...buildChatOwnerWhere(owner),
     },
     include: {
       messages: {
@@ -87,9 +115,13 @@ export async function getChatById(chatId: string): Promise<Chat | null> {
   return chat ? mapPrismaChat(chat) : null
 }
 
-export async function createChat(title: string): Promise<Chat> {
+export async function createChat(
+  title: string,
+  owner: ChatOwnerScope,
+): Promise<Chat> {
   const chat = await prisma.chat.create({
     data: {
+      ...buildChatOwnerCreateData(owner),
       title,
     },
     include: {
@@ -108,12 +140,27 @@ export async function createMessage(params: {
   chatId: string
   role: ChatMessageRole
   content: string
+  owner: ChatOwnerScope
   nextChatTitle?: string
 }): Promise<ChatMessage> {
   const role = params.role === 'user' ? MessageRole.USER : MessageRole.ASSISTANT
 
-  const [, message] = await prisma.$transaction([
-    prisma.chat.update({
+  const message = await prisma.$transaction(async (tx) => {
+    const chat = await tx.chat.findFirst({
+      where: {
+        id: params.chatId,
+        ...buildChatOwnerWhere(params.owner),
+      },
+      select: {
+        id: true,
+      },
+    })
+
+    if (!chat) {
+      throw new Error('CHAT_NOT_FOUND_OR_FORBIDDEN')
+    }
+
+    await tx.chat.update({
       where: {
         id: params.chatId,
       },
@@ -125,8 +172,9 @@ export async function createMessage(params: {
           : {}),
         updatedAt: new Date(),
       },
-    }),
-    prisma.message.create({
+    })
+
+    return tx.message.create({
       data: {
         chatId: params.chatId,
         role,
@@ -138,16 +186,20 @@ export async function createMessage(params: {
         content: true,
         createdAt: true,
       },
-    }),
-  ])
+    })
+  })
 
   return mapPrismaMessage(message)
 }
 
-export async function listMessagesByChatId(chatId: string): Promise<ChatMessage[]> {
+export async function listMessagesByChatId(
+  chatId: string,
+  owner: ChatOwnerScope,
+): Promise<ChatMessage[]> {
   const messages = await prisma.message.findMany({
     where: {
       chatId,
+      chat: buildChatOwnerWhere(owner),
     },
     orderBy: {
       createdAt: 'asc',
@@ -171,10 +223,14 @@ export async function deleteMessage(messageId: string): Promise<void> {
   })
 }
 
-export async function deleteChat(chatId: string): Promise<void> {
-  await prisma.chat.delete({
+export async function deleteChat(
+  chatId: string,
+  owner: ChatOwnerScope,
+): Promise<void> {
+  await prisma.chat.deleteMany({
     where: {
       id: chatId,
+      ...buildChatOwnerWhere(owner),
     },
   })
 }
@@ -182,21 +238,38 @@ export async function deleteChat(chatId: string): Promise<void> {
 export async function renameChat(
   chatId: string,
   title: string,
+  owner: ChatOwnerScope,
 ): Promise<ChatSummary> {
-  const chat = await prisma.chat.update({
-    where: {
-      id: chatId,
-    },
-    data: {
-      title,
-      updatedAt: new Date(),
-    },
-    select: {
-      id: true,
-      title: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+  const chat = await prisma.$transaction(async (tx) => {
+    const existingChat = await tx.chat.findFirst({
+      where: {
+        id: chatId,
+        ...buildChatOwnerWhere(owner),
+      },
+      select: {
+        id: true,
+      },
+    })
+
+    if (!existingChat) {
+      throw new Error('CHAT_NOT_FOUND_OR_FORBIDDEN')
+    }
+
+    return tx.chat.update({
+      where: {
+        id: chatId,
+      },
+      data: {
+        title,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
   })
 
   return mapPrismaChatSummary(chat)
