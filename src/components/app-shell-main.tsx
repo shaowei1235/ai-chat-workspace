@@ -288,7 +288,7 @@ export function AppShellMain({
               <Textarea
                 aria-label={t(locale, 'emptyState', 'inputPlaceholder')}
                 className="min-h-24 resize-none border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
-                disabled={!currentChat || isGenerating || isGuestLimitReached}
+                disabled={isGenerating || isGuestLimitReached}
                 onChange={(event) => onInputChange(event.target.value)}
                 onCompositionEnd={() => {
                   isComposingRef.current = false
@@ -313,7 +313,7 @@ export function AppShellMain({
                 placeholder={
                   currentChat
                     ? t(locale, 'emptyState', 'inputPlaceholder')
-                    : t(locale, 'emptyState', 'emptyInputGuard')
+                    : t(locale, 'emptyState', 'inputPlaceholder')
                 }
                 value={inputValue}
               />
@@ -358,8 +358,7 @@ export function AppShellMain({
                   disabled={
                     isGenerating
                       ? false
-                      : !currentChat ||
-                        isGuestLimitReached ||
+                      : isGuestLimitReached ||
                         inputValue.trim().length === 0
                   }
                   onClick={isGenerating ? onStopGenerating : onSendMessage}

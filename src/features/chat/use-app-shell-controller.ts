@@ -551,23 +551,48 @@ export function useAppShellController({
   async function handleSendMessage() {
     const trimmedValue = inputValue.trim()
 
-    if (
-      !currentChatId ||
-      !currentChat ||
-      trimmedValue.length === 0 ||
-      isGenerating ||
-      isGuestLimitReached
-    ) {
+    if (trimmedValue.length === 0 || isGenerating || isGuestLimitReached) {
       return
     }
 
-    const targetChatId = currentChatId
     const previousChatSnapshot = currentChat
     const previousChatSummaries = chatSummaries
+    let targetChat = currentChat
+
+    // 没有 active chat 时，发送第一条消息前先创建 chat，并直接使用返回的 chatId 继续后续链路。
+    // 这里不能依赖 setState 后的 currentChatId，因为 React 状态更新不是同步可读的。
+    if (!targetChat) {
+      try {
+        const data = await createChat(t(locale, 'sidebar', 'newChatDefaultTitle'))
+
+        targetChat = data.chat
+        setCurrentChatId(data.chat.id)
+        setCurrentChat(data.chat)
+        setChatSummaries((previousChats) =>
+          sortChatSummaries([
+            {
+              id: data.chat.id,
+              title: data.chat.title,
+              createdAt: data.chat.createdAt,
+              updatedAt: data.chat.updatedAt,
+            },
+            ...previousChats.filter((chat) => chat.id !== data.chat.id),
+          ]),
+        )
+        setChatListError(null)
+      } catch (error) {
+        console.error('发送前自动创建对话失败', error)
+        setChatListError(t(locale, 'sidebar', 'loadErrorDescription'))
+        setRequestError(t(locale, 'emptyState', 'requestErrorMessage'))
+        return
+      }
+    }
+
+    const targetChatId = targetChat.id
     const now = new Date().toISOString()
     const nextChatTitle = shouldAutoUpdateChatTitle({
-      currentTitle: currentChat.title,
-      existingMessageCount: currentChat.messages.length,
+      currentTitle: targetChat.title,
+      existingMessageCount: targetChat.messages.length,
       firstUserMessageContent: trimmedValue,
     })
       ? createChatTitleFromMessage(trimmedValue)
