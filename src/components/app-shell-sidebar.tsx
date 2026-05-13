@@ -4,14 +4,17 @@ import { useRouter } from 'next/navigation'
 import { signIn, signOut } from 'next-auth/react'
 import { useTheme } from '@/components/theme-provider'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
+  CircleX,
   Globe2,
   Github,
   MessageSquare,
   Moon,
   Pencil,
   Plus,
+  Search,
   Settings2,
   Sun,
   Trash2,
@@ -20,7 +23,7 @@ import {
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 import type { AuthUser } from '@/types/auth'
-import type { ChatSummary } from '@/types/chat'
+import type { ChatSearchResult, ChatSummary } from '@/types/chat'
 
 const MAX_CHAT_TITLE_LENGTH = 50
 type AppShellSidebarProps = {
@@ -29,12 +32,19 @@ type AppShellSidebarProps = {
   chatListError: string | null
   chats: ChatSummary[]
   currentChatId: string | null
+  isSearchLoading: boolean
+  isSearchMode: boolean
   locale: Locale
   onCreateChat: () => void
+  onClearSearch: () => void
   onDeleteChat: (chatId: string) => void
   onRenameChat: (chatId: string, nextTitle: string) => Promise<void>
   onRetryChatList: () => void
+  onSearchQueryChange: (nextValue: string) => void
   onSelectChat: (chatId: string) => void
+  searchError: string | null
+  searchQuery: string
+  searchResults: ChatSearchResult[]
 }
 
 function formatChatCreatedAt(locale: Locale, createdAt: string) {
@@ -52,12 +62,19 @@ export function AppShellSidebar({
   chatListError,
   chats,
   currentChatId,
+  isSearchLoading,
+  isSearchMode,
   locale,
   onCreateChat,
+  onClearSearch,
   onDeleteChat,
   onRenameChat,
   onRetryChatList,
+  onSearchQueryChange,
   onSelectChat,
+  searchError,
+  searchQuery,
+  searchResults,
 }: AppShellSidebarProps) {
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
@@ -172,10 +189,37 @@ export function AppShellSidebar({
             {t(locale, 'sidebar', 'newChat')}
           </Button>
 
+          <div className="relative mt-3">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-9 rounded-xl bg-background/70 pl-9 pr-9 text-sm dark:bg-background/60"
+              onChange={(event) => {
+                onSearchQueryChange(event.target.value)
+              }}
+              placeholder={t(locale, 'sidebar', 'searchPlaceholder')}
+              // Use a plain text input here so the browser does not inject its native
+              // search clear button and clash with our custom clear action.
+              type="text"
+              value={searchQuery}
+            />
+            {searchQuery.trim().length > 0 ? (
+              <button
+                aria-label={t(locale, 'sidebar', 'clearSearchLabel')}
+                className="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                onClick={onClearSearch}
+                type="button"
+              >
+                <CircleX className="size-4" />
+              </button>
+            ) : null}
+          </div>
+
           <div className="mt-6 flex min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between px-1 pb-2">
               <div className="text-xs font-medium text-muted-foreground">
-                {t(locale, 'sidebar', 'chatSectionTitle')}
+                {isSearchMode
+                  ? t(locale, 'sidebar', 'searchResultsTitle')
+                  : t(locale, 'sidebar', 'chatSectionTitle')}
               </div>
             </div>
 
@@ -186,7 +230,73 @@ export function AppShellSidebar({
             ) : null}
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              {chatListError ? (
+              {isSearchMode ? (
+                searchError ? (
+                  <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-4 dark:bg-destructive/10">
+                    <div className="text-sm font-medium text-foreground">
+                      {t(locale, 'sidebar', 'searchErrorTitle')}
+                    </div>
+                    <div className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {searchError}
+                    </div>
+                  </div>
+                ) : isSearchLoading ? (
+                  <div className="rounded-xl border border-dashed border-border/70 bg-background/50 px-3 py-4">
+                    <div className="text-sm font-medium">
+                      {t(locale, 'sidebar', 'searchLoadingTitle')}
+                    </div>
+                    <div className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {t(locale, 'sidebar', 'searchLoadingDescription')}
+                    </div>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border/70 bg-background/50 px-3 py-4">
+                    <div className="text-sm font-medium">
+                      {t(locale, 'sidebar', 'searchEmptyTitle')}
+                    </div>
+                    <div className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {t(locale, 'sidebar', 'searchEmptyDescription')}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {searchResults.map((result) => {
+                      const isActive = result.chatId === currentChatId
+
+                      return (
+                        <button
+                          className={cn(
+                            'flex w-full cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors outline-none hover:bg-muted/40',
+                            isActive
+                              ? 'bg-primary/10 text-foreground dark:bg-primary/15'
+                              : 'text-foreground',
+                          )}
+                          key={result.matchedMessageId}
+                          onClick={() => onSelectChat(result.chatId)}
+                          type="button"
+                        >
+                          <div
+                            className={cn(
+                              'flex size-8 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/70 text-muted-foreground',
+                              isActive && 'border-primary/30 bg-primary/10 text-primary dark:bg-primary/15',
+                            )}
+                          >
+                            <Search className="size-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">
+                              {result.chatTitle}
+                            </div>
+                            <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                              {result.preview}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              ) : chatListError ? (
                 <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-4 dark:bg-destructive/10">
                   <div className="text-sm font-medium text-foreground">
                     {t(locale, 'sidebar', 'loadErrorTitle')}

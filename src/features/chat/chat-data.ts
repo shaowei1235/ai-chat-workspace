@@ -3,7 +3,13 @@ import 'server-only'
 import { MessageRole, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type { ChatOwnerScope } from '@/types/chat-owner'
-import type { Chat, ChatMessage, ChatMessageRole, ChatSummary } from '@/types/chat'
+import type {
+  Chat,
+  ChatMessage,
+  ChatMessageRole,
+  ChatSearchResult,
+  ChatSummary,
+} from '@/types/chat'
 
 function buildChatOwnerWhere(owner: ChatOwnerScope): Prisma.ChatWhereInput {
   return owner.kind === 'user'
@@ -75,6 +81,31 @@ function mapPrismaChat(chat: {
   }
 }
 
+function buildSearchPreview(content: string, query: string) {
+  const normalizedContent = content.replace(/\s+/g, ' ').trim()
+  const normalizedQuery = query.trim().toLowerCase()
+
+  if (normalizedContent.length === 0) {
+    return ''
+  }
+
+  const matchIndex = normalizedContent.toLowerCase().indexOf(normalizedQuery)
+
+  if (matchIndex < 0) {
+    return normalizedContent.slice(0, 80)
+  }
+
+  const previewStart = Math.max(matchIndex - 24, 0)
+  const previewEnd = Math.min(
+    matchIndex + normalizedQuery.length + 36,
+    normalizedContent.length,
+  )
+  const prefix = previewStart > 0 ? '...' : ''
+  const suffix = previewEnd < normalizedContent.length ? '...' : ''
+
+  return `${prefix}${normalizedContent.slice(previewStart, previewEnd)}${suffix}`
+}
+
 export async function listChatSummaries(
   owner: ChatOwnerScope,
 ): Promise<ChatSummary[]> {
@@ -92,6 +123,53 @@ export async function listChatSummaries(
   })
 
   return chats.map(mapPrismaChatSummary)
+}
+
+export async function searchChatContents(
+  owner: ChatOwnerScope,
+  query: string,
+): Promise<ChatSearchResult[]> {
+  const trimmedQuery = query.trim()
+
+  if (trimmedQuery.length === 0) {
+    return []
+  }
+
+  const messages = await prisma.message.findMany({
+    where: {
+      content: {
+        contains: trimmedQuery,
+        mode: 'insensitive',
+      },
+      chat: buildChatOwnerWhere(owner),
+    },
+    orderBy: {
+      chat: {
+        updatedAt: 'desc',
+      },
+    },
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      chat: {
+        select: {
+          id: true,
+          title: true,
+          updatedAt: true,
+        },
+      },
+    },
+    take: 20,
+  })
+
+  return messages.map((message) => ({
+    chatId: message.chat.id,
+    chatTitle: message.chat.title,
+    matchedMessageId: message.id,
+    preview: buildSearchPreview(message.content, trimmedQuery),
+    updatedAt: message.chat.updatedAt.toISOString(),
+  }))
 }
 
 export async function getChatById(

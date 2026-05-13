@@ -29,6 +29,7 @@ export function AppShell({
     chatListError,
     chatLoadError,
     chatSummaries,
+    clearSearch,
     currentChat,
     currentChatId,
     generatingMessageId,
@@ -40,6 +41,7 @@ export function AppShell({
     handleRegenerateResponse,
     handleRetryChatList,
     handleRetryCurrentChat,
+    handleSearchQueryChange,
     handleSelectChat,
     handleSendMessage,
     handleStopGenerating,
@@ -48,7 +50,12 @@ export function AppShell({
     isGenerating,
     isGuestLimitReached,
     isGuestUsageLoading,
+    isSearchLoading,
+    isSearchMode,
     requestError,
+    searchError,
+    searchQuery,
+    searchResults,
   } = useAppShellController({
     authUser,
     initialChatListError,
@@ -65,13 +72,20 @@ export function AppShell({
         chatActionError={chatActionError}
         chatListError={chatListError}
         chats={chatSummaries}
+        isSearchLoading={isSearchLoading}
+        isSearchMode={isSearchMode}
         currentChatId={currentChatId}
         locale={locale}
         onCreateChat={handleCreateChat}
+        onClearSearch={clearSearch}
         onDeleteChat={handleDeleteChat}
         onRenameChat={handleRenameChat}
         onRetryChatList={handleRetryChatList}
+        onSearchQueryChange={handleSearchQueryChange}
         onSelectChat={handleSelectChat}
+        searchError={searchError}
+        searchQuery={searchQuery}
+        searchResults={searchResults}
       />
       <AppShellMain
         authUser={authUser}

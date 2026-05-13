@@ -23,3 +23,11 @@ export type ChatSummary = {
   createdAt: string
   updatedAt: string
 }
+
+export type ChatSearchResult = {
+  chatId: string
+  chatTitle: string
+  matchedMessageId: string
+  preview: string
+  updatedAt: string
+}

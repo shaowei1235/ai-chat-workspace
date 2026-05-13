@@ -11,6 +11,7 @@ import {
   fetchChatSummaries,
   fetchGuestUsage,
   renameChat,
+  searchChats,
   type GuestUsageInfo,
 } from '@/features/chat/chat-client'
 import { consumeAssistantStream } from '@/features/chat/chat-stream'
@@ -19,7 +20,7 @@ import {
   shouldAutoUpdateChatTitle,
 } from '@/features/chat/chat-title'
 import type { AuthUser } from '@/types/auth'
-import type { Chat, ChatMessage, ChatSummary } from '@/types/chat'
+import type { Chat, ChatMessage, ChatSearchResult, ChatSummary } from '@/types/chat'
 
 type UseAppShellControllerParams = {
   authUser: AuthUser | null
@@ -63,6 +64,10 @@ export function useAppShellController({
     null,
   )
   const [inputValue, setInputValue] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<ChatSearchResult[]>([])
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [isSearchLoading, setIsSearchLoading] = useState(false)
   const [chatListError, setChatListError] = useState<string | null>(
     initialChatListError,
   )
@@ -85,6 +90,7 @@ export function useAppShellController({
   const isAuthenticated = authUser !== null
   const isGuestLimitReached =
     !isAuthenticated && guestUsage.remainingCount <= 0
+  const isSearchMode = searchQuery.trim().length > 0
 
   // 从数据库重新拉取 sidebar 的 chat 列表，并按最近更新时间重新排序。
   async function refreshChatList() {
@@ -205,6 +211,18 @@ export function useAppShellController({
     setInputValue(nextValue)
   }
 
+  function handleSearchQueryChange(nextValue: string) {
+    setSearchQuery(nextValue)
+    setSearchError(null)
+  }
+
+  function clearSearch() {
+    setSearchQuery('')
+    setSearchResults([])
+    setSearchError(null)
+    setIsSearchLoading(false)
+  }
+
   // 新建对话：先请求服务端写数据库，再把返回的 chat 同步到当前界面。
   async function handleCreateChat() {
     try {
@@ -313,6 +331,7 @@ export function useAppShellController({
       setRequestError(null)
       setChatLoadError(null)
       await loadChat(chatId)
+      clearSearch()
     } catch (error) {
       if (
         error instanceof AppShellRequestError &&
@@ -333,6 +352,45 @@ export function useAppShellController({
       setChatLoadError(t(locale, 'emptyState', 'chatLoadErrorMessage'))
     }
   }
+
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim()
+
+    if (trimmedQuery.length === 0) {
+      setSearchResults([])
+      setSearchError(null)
+      setIsSearchLoading(false)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsSearchLoading(true)
+
+      void searchChats(trimmedQuery)
+        .then((data) => {
+          setSearchResults(
+            [...data.results].sort(
+              (left, right) =>
+                new Date(right.updatedAt).getTime() -
+                new Date(left.updatedAt).getTime(),
+            ),
+          )
+          setSearchError(null)
+        })
+        .catch((error) => {
+          console.error('搜索当前身份下的对话失败', error)
+          setSearchResults([])
+          setSearchError(t(locale, 'sidebar', 'searchErrorDescription'))
+        })
+        .finally(() => {
+          setIsSearchLoading(false)
+        })
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [locale, searchQuery])
 
   // streaming 过程中，不断把增量内容写回同一条 assistant 占位消息。
   function updateAssistantMessageContent(
@@ -636,6 +694,7 @@ export function useAppShellController({
     chatListError,
     chatLoadError,
     chatSummaries,
+    clearSearch,
     currentChat,
     currentChatId,
     generatingMessageId,
@@ -647,6 +706,7 @@ export function useAppShellController({
     handleRegenerateResponse,
     handleRetryChatList,
     handleRetryCurrentChat,
+    handleSearchQueryChange,
     handleSelectChat,
     handleSendMessage,
     handleStopGenerating,
@@ -655,6 +715,11 @@ export function useAppShellController({
     isGenerating,
     isGuestLimitReached,
     isGuestUsageLoading,
+    isSearchLoading,
+    isSearchMode,
     requestError,
+    searchError,
+    searchQuery,
+    searchResults,
   }
 }

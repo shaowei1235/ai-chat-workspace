@@ -1,4 +1,4 @@
-import type { Chat, ChatSummary } from '@/types/chat'
+import type { Chat, ChatSearchResult, ChatSummary } from '@/types/chat'
 
 export type ChatsResponse = {
   chats: ChatSummary[]
@@ -10,6 +10,10 @@ export type ChatResponse = {
 
 export type RenameChatResponse = {
   chat: ChatSummary
+}
+
+export type ChatSearchResponse = {
+  results: ChatSearchResult[]
 }
 
 type ErrorResponse = {
@@ -138,4 +142,13 @@ export async function fetchGuestUsage() {
   }
 
   return readJson<GuestUsageResponse>(response)
+}
+
+export async function searchChats(query: string) {
+  const response = await fetch(`/api/chats/search?query=${encodeURIComponent(query)}`, {
+    method: 'GET',
+    cache: 'no-store',
+  })
+
+  return readJson<ChatSearchResponse>(response)
 }
