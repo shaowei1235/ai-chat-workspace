@@ -2,7 +2,7 @@ export const locales = ['zh-CN', 'ja'] as const
 
 export type Locale = (typeof locales)[number]
 
-export const defaultLocale: Locale = 'zh-CN'
+export const defaultLocale: Locale = 'ja'
 
 export function isLocale(value: unknown): value is Locale {
   return (
@@ -31,6 +31,7 @@ export const messages: Record<Locale, MessageDictionary> = {
       localeJa: '日本語',
       themeLight: '浅色',
       themeDark: '深色',
+      themeSystem: '跟随系统',
       renameChatLabel: '重命名对话',
       renameChatErrorEmpty: '标题不能为空。',
       renameChatErrorTooLong: '标题最多支持 50 个字符。',
@@ -133,6 +134,7 @@ export const messages: Record<Locale, MessageDictionary> = {
       localeJa: '日本語',
       themeLight: 'ライト',
       themeDark: 'ダーク',
+      themeSystem: 'システム',
       renameChatLabel: 'チャット名を変更',
       renameChatErrorEmpty: 'タイトルは空にできません。',
       renameChatErrorTooLong: 'タイトルは 50 文字以内で入力してください。',

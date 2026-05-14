@@ -8,18 +8,16 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   CircleX,
-  Globe2,
   Github,
   MessageSquare,
-  Moon,
   Pencil,
   Plus,
   Search,
   Settings2,
-  Sun,
   Trash2,
   UserCircle2,
 } from 'lucide-react'
+import { localeCookieName, localeStorageKey } from '@/i18n/constants'
 import { t, type Locale } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 import type { AuthUser } from '@/types/auth'
@@ -56,6 +54,16 @@ function formatChatCreatedAt(locale: Locale, createdAt: string) {
   }).format(new Date(createdAt))
 }
 
+function resolveBrowserLocale(): Locale {
+  const browserLocales = [...navigator.languages, navigator.language].filter(
+    Boolean,
+  )
+
+  return browserLocales.some((value) => value.toLowerCase().startsWith('zh'))
+    ? 'zh-CN'
+    : 'ja'
+}
+
 export function AppShellSidebar({
   authUser,
   chatActionError,
@@ -77,13 +85,14 @@ export function AppShellSidebar({
   searchResults,
 }: AppShellSidebarProps) {
   const router = useRouter()
-  const { resolvedTheme, setTheme } = useTheme()
+  const { setTheme, theme } = useTheme()
   const [isPending, startTransition] = useTransition()
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [draftTitle, setDraftTitle] = useState('')
   const [renameError, setRenameError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const isComposingRef = useRef(false)
+  const didSyncLocaleRef = useRef(false)
 
   useEffect(() => {
     if (!editingChatId) {
@@ -93,6 +102,52 @@ export function AppShellSidebar({
     inputRef.current?.focus()
     inputRef.current?.select()
   }, [editingChatId])
+
+  useEffect(() => {
+    if (didSyncLocaleRef.current) {
+      return
+    }
+
+    didSyncLocaleRef.current = true
+
+    const hasLocaleCookie = document.cookie
+      .split('; ')
+      .some((entry) => entry.startsWith(`${localeCookieName}=`))
+
+    if (hasLocaleCookie) {
+      return
+    }
+
+    const storedLocale = window.localStorage.getItem(localeStorageKey)
+    const preferredLocale =
+      storedLocale === 'zh-CN' || storedLocale === 'ja'
+        ? storedLocale
+        : resolveBrowserLocale()
+
+    window.localStorage.setItem(localeStorageKey, preferredLocale)
+
+    if (preferredLocale === locale) {
+      return
+    }
+
+    void fetch('/api/locale', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        locale: preferredLocale,
+      }),
+    })
+      .then(() => {
+        startTransition(() => {
+          router.refresh()
+        })
+      })
+      .catch((error) => {
+        console.error('初始化语言偏好失败', error)
+      })
+  }, [locale, router, startTransition])
 
   function startEditingChat(chat: ChatSummary) {
     setEditingChatId(chat.id)
@@ -149,6 +204,8 @@ export function AppShellSidebar({
       return
     }
 
+    window.localStorage.setItem(localeStorageKey, nextLocale)
+
     await fetch('/api/locale', {
       method: 'POST',
       headers: {
@@ -163,11 +220,11 @@ export function AppShellSidebar({
     })
   }
 
-  function handleThemeChange(nextTheme: 'light' | 'dark') {
+  function handleThemeChange(nextTheme: 'light' | 'dark' | 'system') {
     setTheme(nextTheme)
   }
 
-  const activeTheme = resolvedTheme === 'dark' ? 'dark' : 'light'
+  const activeTheme = theme === 'light' || theme === 'dark' ? theme : 'system'
   const isAuthenticated = authUser !== null
 
   return (
@@ -515,7 +572,7 @@ export function AppShellSidebar({
               <PopoverTrigger asChild>
                 <Button
                   aria-label={t(locale, 'sidebar', 'settingsSectionTitle')}
-                  className="h-8 gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-8 gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                   size="sm"
                   type="button"
                   variant="ghost"
@@ -526,95 +583,71 @@ export function AppShellSidebar({
               </PopoverTrigger>
               <PopoverContent
                 align="end"
-                className="w-64 p-2.5"
+                className="w-72 rounded-2xl border-border/70 p-3 shadow-lg"
                 side="top"
               >
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <div className="px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
-                      {t(locale, 'sidebar', 'languageLabel')}
-                    </div>
-                    <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-1">
-                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                        <Globe2 className="size-3.5 shrink-0" />
-                        <span className="truncate">{t(locale, 'sidebar', 'languageLabel')}</span>
+                <div className="space-y-4">
+                  <div className="border-b border-border/60 px-1 pb-2 text-sm font-medium">
+                    {t(locale, 'sidebar', 'settingsSectionTitle')}
+                  </div>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="px-1 text-xs font-medium text-muted-foreground">
+                        {t(locale, 'sidebar', 'languageLabel')}
                       </div>
-                      <div className="inline-flex items-center rounded-md border border-border/60 bg-muted/35 p-0.5 dark:bg-muted/20">
+                      <div className="inline-flex w-full items-center rounded-xl border border-border/60 bg-muted/30 p-1 dark:bg-muted/20">
                         {(['zh-CN', 'ja'] as const).map((nextLocale) => {
                           const isActive = nextLocale === locale
 
                           return (
-                            <Button
+                            <button
                               className={cn(
-                                'h-6 min-w-[3.1rem] rounded-[5px] px-2 text-[11px] font-medium shadow-none',
-                                'border-transparent bg-transparent text-muted-foreground hover:bg-background/80 hover:text-foreground dark:hover:bg-background/60',
+                                'flex-1 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                                'text-muted-foreground hover:bg-background/70 hover:text-foreground dark:hover:bg-background/50',
                                 isActive &&
-                                  'border-border/70 bg-background text-foreground hover:bg-background dark:border-border/60 dark:bg-background/80',
+                                  'bg-background text-foreground shadow-xs dark:bg-background/80',
                               )}
                               disabled={isPending}
                               key={nextLocale}
                               onClick={() => {
                                 void handleLocaleChange(nextLocale)
                               }}
-                              size="xs"
                               type="button"
-                              variant="ghost"
                             >
                               {nextLocale === 'zh-CN'
                                 ? t(locale, 'sidebar', 'localeZhCn')
                                 : t(locale, 'sidebar', 'localeJa')}
-                            </Button>
+                            </button>
                           )
                         })}
                       </div>
                     </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
-                      {t(locale, 'sidebar', 'themeLabel')}
-                    </div>
-                    <div
-                      className="flex items-center justify-between gap-3 rounded-lg px-1 py-1"
-                      suppressHydrationWarning
-                    >
-                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                        {activeTheme === 'dark' ? (
-                          <Moon className="size-3.5 shrink-0" />
-                        ) : (
-                          <Sun className="size-3.5 shrink-0" />
-                        )}
-                        <span className="truncate">{t(locale, 'sidebar', 'themeLabel')}</span>
+                    <div className="space-y-2" suppressHydrationWarning>
+                      <div className="px-1 text-xs font-medium text-muted-foreground">
+                        {t(locale, 'sidebar', 'themeLabel')}
                       </div>
-                      <div className="inline-flex items-center rounded-md border border-border/60 bg-muted/35 p-0.5 dark:bg-muted/20">
-                        {(['light', 'dark'] as const).map((nextTheme) => {
+                      <div className="inline-flex w-full items-center rounded-xl border border-border/60 bg-muted/30 p-1 dark:bg-muted/20">
+                        {(['light', 'dark', 'system'] as const).map((nextTheme) => {
                           const isActive = activeTheme === nextTheme
 
                           return (
-                            <Button
+                            <button
                               className={cn(
-                                'h-6 min-w-[3.1rem] rounded-[5px] px-2 text-[11px] font-medium shadow-none',
-                                'border-transparent bg-transparent text-muted-foreground hover:bg-background/80 hover:text-foreground dark:hover:bg-background/60',
+                                'flex-1 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                                'text-muted-foreground hover:bg-background/70 hover:text-foreground dark:hover:bg-background/50',
                                 isActive &&
-                                  'border-border/70 bg-background text-foreground hover:bg-background dark:border-border/60 dark:bg-background/80',
+                                  'bg-background text-foreground shadow-xs dark:bg-background/80',
                               )}
                               key={nextTheme}
                               onClick={() => handleThemeChange(nextTheme)}
-                              size="xs"
                               type="button"
-                              variant="ghost"
                             >
-                              {nextTheme === 'light' ? (
-                                <>
-                                  <Sun className="size-3" />
-                                  {t(locale, 'sidebar', 'themeLight')}
-                                </>
-                              ) : (
-                                <>
-                                  <Moon className="size-3" />
-                                  {t(locale, 'sidebar', 'themeDark')}
-                                </>
-                              )}
-                            </Button>
+                              {nextTheme === 'light'
+                                ? t(locale, 'sidebar', 'themeLight')
+                                : nextTheme === 'dark'
+                                  ? t(locale, 'sidebar', 'themeDark')
+                                  : t(locale, 'sidebar', 'themeSystem')}
+                            </button>
                           )
                         })}
                       </div>

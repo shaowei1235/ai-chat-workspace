@@ -1,7 +1,6 @@
 import { cookies } from 'next/headers'
+import { localeCookieName } from '@/i18n/constants'
 import { defaultLocale, isLocale, type Locale } from '@/i18n/messages'
-
-export const localeCookieName = 'acw-locale'
 
 export async function getLocale(): Promise<Locale> {
   // Simple locale source for early steps: an explicit cookie set by the app later.

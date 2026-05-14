@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { localeCookieName } from '@/i18n/get-locale'
+import { localeCookieName } from '@/i18n/constants'
 import { defaultLocale, isLocale } from '@/i18n/messages'
 
 export async function POST(request: Request) {
